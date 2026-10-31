@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ballerburg</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section id="menu" class="card">
+      <p class="eyebrow">Two castles, one valley</p>
+      <h1>Ballerburg</h1>
+      <p>Set the angle and rocket fuel, kill the king, and keep your people happy.</p>
+      <label class="field">Map
+        <select id="map"></select>
+      </label>
+      <button id="start" type="button">Start game</button>
+    </section>
+
+    <section id="play" hidden>
+      <div id="frame">
+        <canvas id="view" width="4800" height="540" tabindex="0"></canvas>
+      </div>
+      <p id="status"></p>
+      <p id="detail"></p>
+      <p id="stats"></p>
+      <div class="controls">
+        <label>Angle <span id="angle-val">48°</span>
+          <input id="angle" type="range" min="10" max="80" value="48">
+        </label>
+        <label>Rocket Fuel <span id="powder-val">20</span>
+          <input id="powder" type="range" min="3" max="24" value="20">
+        </label>
+        <button id="fire" type="button">Fire</button>
+        <button id="pass" type="button" class="ghost">Hold fire</button>
+      </div>
+      <fieldset id="shop">
+        <legend>Treasury</legend>
+        <button id="buy-ball" type="button">Rocket</button>
+        <button id="buy-powder" type="button">Rocket Fuel</button>
+        <button id="buy-launcher" type="button" hidden>Buy launcher</button>
+        <button id="wall" type="button">Wall</button>
+        <button id="tower" type="button">Mine tower</button>
+        <button id="borrow" type="button">Borrow</button>
+        <button id="repay" type="button">Repay</button>
+        <label class="field">Food
+          <select id="food">
+            <option value="0">Little</option>
+            <option value="1" selected>Enough</option>
+            <option value="2">Plenty</option>
+          </select>
+        </label>
+      </fieldset>
+      <p class="hint">Arrows change angle and rocket fuel, space fires, the mouse wheel zooms. Food takes effect next turn.</p>
+    </section>
+  </main>
+
+  <section id="over" hidden>
+    <div class="card">
+      <h2 id="over-title"></h2>
+      <p id="over-text"></p>
+      <button id="again" type="button">Again</button>
+    </div>
+  </section>
+
+  <script src="src/balance.js"></script>
+  <script src="src/castles.js"></script>
+  <script src="src/terrain.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/economy.js"></script>
+  <script src="src/ai.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

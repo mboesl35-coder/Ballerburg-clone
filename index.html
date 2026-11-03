@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ballerburg_2026</title>
+  <link rel="stylesheet" href="styles.css?v=16">
+</head>
+<body>
+  <main>
+    <section id="menu">
+      <div class="splash-stage">
+        <div class="splash-bg" aria-hidden="true">
+          <img src="Start page picture.jpeg" alt="">
+        </div>
+        <div class="splash-veil" aria-hidden="true"></div>
+        <div class="splash-copy">
+          <p class="eyebrow">Two castles, one valley</p>
+          <h1>Ballerburg</h1>
+          <p class="splash-year">2026</p>
+          <p class="splash-lead">A turn-based artillery duel. You hold the left castle; the Orc Overlord holds the right. Each turn you aim a rocket, spend gold on walls, mines, and weapons, and try to kill the king on the far hill before his special military operation kills you. Guard your population. History, he insists, is on his side.</p>
+          <div class="mode-actions">
+            <button id="story-mode" type="button">Story Mode</button>
+            <button id="free-game" type="button" class="ghost">Free Game</button>
+          </div>
+          <p id="free-soon" class="mode-note" hidden aria-live="polite">Free Game is not open yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="play" hidden>
+      <div id="frame">
+        <canvas id="view" width="4800" height="1532" tabindex="0"></canvas>
+      </div>
+      <p id="status"></p>
+      <p id="detail"></p>
+      <p id="tip" hidden></p>
+      <svg id="icons" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <symbol id="ico-gold" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" fill="#8a6424"/>
+          <circle cx="12" cy="12" r="8.5" fill="#e6c56a"/>
+          <circle cx="12" cy="12" r="6.6" fill="none" stroke="#a67c32" stroke-width="0.9"/>
+          <path fill="#fff6d4" d="M7.2 9.4a6.2 6.2 0 0 1 5.4-2.6 6 6 0 0 0-4.2 1.5c-.7.7-1.1 1.2-1.2 1.1z"/>
+          <path fill="#7a5a22" d="M8.2 14.7h7.6v1.2H8.2zm.2-1.3 1.4-2.2.9 1.3L12 9.6l1.3 2.9.9-1.3 1.4 2.2z"/>
+        </symbol>
+        <symbol id="ico-income" viewBox="0 0 24 24">
+          <circle cx="8" cy="15" r="6.2" fill="#8a6424"/>
+          <circle cx="8" cy="15" r="5" fill="#e6c56a"/>
+          <path d="M8 12.6v4.6M6.1 14.9h3.8" stroke="#7a5a22" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M16.8 4.2v8.2" stroke="#f3e6cf" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M13.8 7.1 16.8 4.1l3 3" fill="none" stroke="#f3e6cf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </symbol>
+        <symbol id="ico-pop" viewBox="0 0 24 24">
+          <circle cx="8" cy="7.4" r="2.6" fill="#f3e6cf"/>
+          <path fill="#f3e6cf" d="M3 18.6c.5-3.4 2.4-5.2 5-5.2s4.5 1.8 5 5.2z"/>
+          <circle cx="16.3" cy="8.3" r="2.15" fill="#d7c4a4"/>
+          <path fill="#d7c4a4" d="M12.4 18.6c.4-2.7 1.8-4.2 3.8-4.2 2 0 3.4 1.5 3.8 4.2z"/>
+        </symbol>
+        <symbol id="ico-oil" viewBox="0 0 24 24">
+          <path fill="#3a3228" d="M2.8 20.2h18.4v1.8H2.8z"/>
+          <path fill="#4a3428" d="M3.4 15.2h6.4v5H3.4z"/>
+          <path fill="#c4552a" d="M3.4 15.2h6.4v1.5H3.4z"/>
+          <path fill="#241c14" d="M4.4 17.4h4.4v.8H4.4zm0 1.4h4.4v.8H4.4z"/>
+          <path fill="#e6c56a" d="M4.4 17.4h2.2v.8H4.4zm2.2 1.4h2.2v.8H6.6z"/>
+          <path fill="#3e4c58" d="M8.2 19.8 11.1 4.6h1.8l2.9 15.2h-1.7l-.7-3.6h-2l-.7 3.6z"/>
+          <path fill="#8ea0ae" d="M10.6 8.2h2.8l.35 1.7h-3.5zm.45 3.1h2l.4 2.1h-2.8z"/>
+          <path fill="#d7dee4" d="M10.2 3.1h3.6v2.3h-3.6z"/>
+          <circle cx="12" cy="4.2" r="0.7" fill="#e07a3d"/>
+          <ellipse cx="18.2" cy="18.6" rx="2.8" ry="1.7" fill="#2a2118"/>
+          <ellipse cx="18.2" cy="17.7" rx="2.8" ry="1.8" fill="#3a2618"/>
+          <ellipse cx="17.4" cy="17.2" rx="1" ry="0.55" fill="#6a5344"/>
+        </symbol>
+        <symbol id="ico-tower" viewBox="0 0 24 24">
+          <path fill="#8d7b62" d="M5.6 9.2h3.1V11H5.6zm4.85 0h3.1V11h-3.1zm4.85 0H18.4V11h-3.1z"/>
+          <path fill="#cbb89a" d="M6.4 10.6h11.2V20H6.4z"/>
+          <path fill="#efe4d4" d="M6.4 10.6h11.2v1.3H6.4z"/>
+          <path fill="#3a2618" d="M10.3 14.2h3.4V20h-3.4z"/>
+          <circle cx="12" cy="16.4" r="1.15" fill="#e6c56a"/>
+        </symbol>
+        <symbol id="ico-rocket" viewBox="0 0 24 24">
+          <path fill="#e07a3d" d="M10.1 18.2c.2 1.8 1.9 3.2 1.9 3.2s1.7-1.4 1.9-3.2c-.5.35-1.2.55-1.9.55s-1.4-.2-1.9-.55z"/>
+          <path fill="#f4efe4" d="M12 2.2c2.7 2.3 3.9 5.5 3.9 8.6v4.4H8.1v-4.4c0-3.1 1.2-6.3 3.9-8.6z"/>
+          <path fill="#c4552a" d="M8.1 14.4 5.4 17.6h3.3zm7.8 0 2.7 3.2h-3.3z"/>
+          <circle cx="12" cy="9.2" r="1.45" fill="#2a4178"/>
+        </symbol>
+        <symbol id="ico-guidance" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="7.2" fill="none" stroke="#e6c56a" stroke-width="1.6"/>
+          <circle cx="12" cy="12" r="3.1" fill="none" stroke="#f3e6cf" stroke-width="1.3"/>
+          <path d="M12 2.6v4.2M12 17.2v4.2M2.6 12h4.2M17.2 12h4.2" stroke="#e6c56a" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="1.15" fill="#c42323"/>
+        </symbol>
+        <symbol id="ico-fuel" viewBox="0 0 24 24">
+          <path fill="#6b4428" d="M7 8.2h10V19H7z"/>
+          <ellipse cx="12" cy="8.2" rx="5" ry="2" fill="#b07d48"/>
+          <ellipse cx="12" cy="8.2" rx="5" ry="2" fill="none" stroke="#3a2618" stroke-width="0.8"/>
+          <path stroke="#3a2618" stroke-width="1.5" d="M7 12.2h10M7 15.6h10"/>
+          <path fill="#e07a3d" d="M12 4.1c.9 1.15 1.8 1.8 1.8 2.9a1.8 1.8 0 0 1-3.6 0c0-1.1.9-1.75 1.8-2.9z"/>
+          <path fill="#ffd27a" d="M12 5.3c.4.6.8 1 .8 1.6a.8.8 0 0 1-1.6 0c0-.6.4-1 0.8-1.6z"/>
+        </symbol>
+        <symbol id="ico-a2a" viewBox="0 0 24 24">
+          <path fill="#d5dee6" d="M3.2 13.2 14.6 9.2l2.2 2.2-4 11.4-2.3-2.2 1.2-4.6-4.7 1.2z"/>
+          <path fill="#2c74c8" d="M8.2 12.6 13.4 10.8l1.1 1.1-5.2 1.8z"/>
+          <path fill="#e7eef4" d="M14.2 8.8 19.6 3.4l1.2 1.2-5.4 5.4z"/>
+          <path fill="#e07a3d" d="M4.2 16.4 2.4 20.2l3.6-.6 1.4-2.2z"/>
+        </symbol>
+        <symbol id="ico-drone" viewBox="0 0 24 24">
+          <circle cx="5" cy="5" r="2.2" fill="#3a2618"/>
+          <circle cx="19" cy="5" r="2.2" fill="#3a2618"/>
+          <circle cx="5" cy="19" r="2.2" fill="#3a2618"/>
+          <circle cx="19" cy="19" r="2.2" fill="#3a2618"/>
+          <path fill="#8d7b62" d="M6.5 6.5 10.1 10h3.8l3.6-3.5 1.3 1.3-3.6 3.5v3.4l3.6 3.5-1.3 1.3-3.6-3.5h-3.8l-3.6 3.5-1.3-1.3 3.6-3.5V11.3L5.2 7.8z"/>
+          <circle cx="12" cy="12" r="2.35" fill="#c42323"/>
+          <circle cx="12" cy="12" r="1" fill="#ffd0b0"/>
+        </symbol>
+        <symbol id="ico-nuke" viewBox="0 0 24 24">
+          <path fill="#e6c56a" d="M14.08 8.41 17.05 3.25A10.1 10.1 0 0 0 6.95 3.25L9.93 8.41A4.15 4.15 0 0 1 14.08 8.41z"/>
+          <path fill="#e6c56a" d="M7.85 12 1.9 12A10.1 10.1 0 0 0 6.95 20.75l2.97-5.16A4.15 4.15 0 0 1 7.85 12z"/>
+          <path fill="#e6c56a" d="M14.08 15.59 17.05 20.75A10.1 10.1 0 0 0 22.1 12L16.15 12A4.15 4.15 0 0 1 14.08 15.59z"/>
+          <circle cx="12" cy="12" r="2.35" fill="#e6c56a"/>
+          <circle cx="12" cy="12" r="1.05" fill="#fff6d4"/>
+        </symbol>
+        <symbol id="ico-patriot" viewBox="0 0 24 24">
+          <circle cx="6.2" cy="18.6" r="1.7" fill="#5c5348"/>
+          <circle cx="17.8" cy="18.6" r="1.7" fill="#5c5348"/>
+          <path fill="#3c472c" d="M3.5 15.2h17v3.2h-17z"/>
+          <path fill="#667548" d="M3.5 15.2h17v1h-17z"/>
+          <path fill="#4a5838" d="M4.2 11.2h5.2v4.2H4.2z"/>
+          <path fill="#d5e4ee" d="M5.2 12h3.2v2H5.2z"/>
+          <path fill="#5d6b42" d="M8.4 12.6 16.8 4.8h2.4L10.2 13.4z"/>
+          <path fill="#d7dee4" d="M11.2 11.2 18.2 4.6h1.5l-6.6 7.2z"/>
+          <path fill="#d7dee4" d="M12.6 12.4 19.4 6h1.4l-6.4 6.8z"/>
+        </symbol>
+      </svg>
+      <div id="ledgers">
+        <section id="stats" class="ledger you" aria-label="Your economy">
+          <h2>You</h2>
+          <div class="stats"></div>
+          <h3 class="research-head">Research levels</h3>
+          <div class="research-levels"></div>
+        </section>
+        <section id="enemy-stats" class="ledger enemy" aria-label="Enemy economy">
+          <h2>Enemy</h2>
+          <div class="stats"></div>
+          <h3 class="research-head">Research levels</h3>
+          <div class="research-levels"></div>
+        </section>
+      </div>
+      <div class="controls">
+        <label>Angle <span id="angle-val">48°</span>
+          <input id="angle" type="range" min="10" max="80" value="48">
+        </label>
+        <label>Rocket Fuel <span id="powder-val">10</span>
+          <input id="powder" type="range" min="3" max="10" value="10">
+        </label>
+        <div class="shot-actions">
+          <button id="plan-drone" type="button" hidden>Plan a drone attack</button>
+          <div class="shot-row">
+            <button id="fire" type="button">Fire</button>
+            <button id="pass" type="button" class="ghost">Hold fire</button>
+          </div>
+        </div>
+      </div>
+      <fieldset id="shop">
+        <legend>Treasury</legend>
+        <button id="buy-ball" type="button">Rocket</button>
+        <button id="buy-powder" type="button">Rocket Fuel</button>
+        <button id="buy-launcher" type="button" hidden>Buy launcher</button>
+        <button id="mobilisation" type="button">Mobilisation</button>
+        <button id="wall" type="button">Wall</button>
+        <button id="tower" type="button">Mine tower</button>
+        <button id="buy-patriot" type="button">Patriot</button>
+        <button id="buy-a2a" type="button">Air-to-air</button>
+        <button id="buy-drone" type="button" hidden>Attack drone</button>
+        <button id="buy-nuke" type="button" hidden>Nuclear rocket</button>
+      </fieldset>
+      <fieldset id="research">
+        <legend>Research</legend>
+        <button id="research-a2a" type="button">Air-to-air efficiency</button>
+        <button id="research-fuel" type="button">Rocket fuel capacity</button>
+        <button id="research-guidance" type="button">Rocket guidance</button>
+        <button id="research-drone" type="button">Drone factory</button>
+        <button id="research-drone-range" type="button">Drone range</button>
+        <button id="research-nuclear" type="button">Nuclear program</button>
+      </fieldset>
+      <fieldset id="a2a" hidden>
+        <legend>Air-to-air</legend>
+        <label class="check"><input id="a2a-rockets" type="checkbox" checked> Target rockets</label>
+        <label class="check"><input id="a2a-drones" type="checkbox" checked> Target drones</label>
+        <p class="a2a-note">Targeted drones are always intercepted. Rockets use your research chance.</p>
+      </fieldset>
+      <fieldset id="allied-help" hidden>
+        <legend>Diplomacy</legend>
+        <button id="ask-allies" type="button">Ask your allies for more help</button>
+        <button id="peace-talks" type="button" hidden>Initiate peace talks</button>
+      </fieldset>
+      <p class="hint">Arrows change angle and rocket fuel, space fires, the mouse wheel zooms. Plan a drone attack, then click the map.</p>
+    </section>
+  </main>
+
+  <section id="decree" hidden>
+    <div class="card decree-card" role="dialog" aria-modal="true" aria-labelledby="decree-title">
+      <div class="decree-layout">
+        <figure class="portrait">
+          <img src="orc-overlord.png" width="1024" height="441" alt="The Orc Overlord roaring from his throne">
+        </figure>
+        <div class="decree-copy">
+          <p class="eyebrow">A special military operation</p>
+          <h2 id="decree-title">The Orc Overlord</h2>
+          <p id="decree-speech" class="decree-speech">We declare war on you. This is a preemptive strike, carried out strictly in self-defense. You were working with our enemies. You were plotting against us. You were about to strike first, the evidence is irrefutable, history is on our side, and we had no other choice. According to orc history, your country has no right to exist anyway, and the land belongs to orcs. <em>And so on, and so forth.</em></p>
+          <button id="decree-ok" type="button">Man the walls</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="allies" hidden>
+    <div class="card decree-card" role="dialog" aria-modal="true" aria-labelledby="allies-title">
+      <div class="decree-layout">
+        <figure class="portrait">
+          <img id="allies-portrait" src="allies.jpeg" width="2752" height="1536" alt="The leader of the allies, offering a handshake from his office">
+        </figure>
+        <div class="decree-copy">
+          <p id="allies-eyebrow" class="eyebrow">A rules-based partnership</p>
+          <h2 id="allies-title">The Allied Leader</h2>
+          <p id="allies-speech" class="decree-speech">The Orc Overlord's act of aggression has infringed international law. We looked it up. The allies will therefore help you defend your country and your people, a position we have held consistently, and which we are pleased to repeat for anyone who may have missed it the first several times. The allies send you helmets, because the protection of your people begins, as our experts have explained to us, with something a person can wear. The allies send you a patriot system, a contribution of real substance, and one we would ask you not to bury in the middle of the story when you tell it later. The allies send you two hundred and fifty gold, which is not nothing, and five air-to-air missiles, which are also not nothing, and which we would like entered into the record as generosity. You had better be very thankful. Thankfulness is the part of this arrangement that does not have to be shipped.</p>
+          <button id="allies-ok" type="button">We are thankful</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ultimatum" hidden>
+    <div class="card decree-card" role="dialog" aria-modal="true" aria-labelledby="ultimatum-title">
+      <div class="decree-layout">
+        <figure class="portrait">
+          <img src="orc-overlord.png" width="1024" height="441" alt="The Orc Overlord roaring from his throne">
+        </figure>
+        <div class="decree-copy">
+          <p id="ultimatum-eyebrow" class="eyebrow">A limited nuclear operation</p>
+          <h2 id="ultimatum-title">The Orc Overlord</h2>
+          <p id="ultimatum-speech" class="decree-speech">You have had four turns to surrender, and you spent them throwing rocks. How disappointing. We are therefore obliged, purely in self-defense, to introduce our nuclear rockets: sixty-seven of them, aimed at you, your allies, your king, and whatever is left of the hillside. Surrender, and this remains a stern conversation. Refuse, and we will annihilate every one of you and describe it later as a limited operation. The button is polished. Our patience is not.</p>
+          <div class="decree-actions">
+            <button id="ultimatum-dismiss" type="button">Dismiss</button>
+            <button id="ultimatum-surrender" type="button" class="ghost">Surrender</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="over" hidden>
+    <div class="card">
+      <h2 id="over-title"></h2>
+      <p id="over-text"></p>
+      <button id="again" type="button">Again</button>
+    </div>
+  </section>
+
+  <script src="src/balance.js"></script>
+  <script src="src/castles.js"></script>
+  <script src="src/terrain.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/economy.js"></script>
+  <script src="src/ai.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

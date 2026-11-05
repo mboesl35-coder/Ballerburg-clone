@@ -40,6 +40,7 @@
   const researchA2a = document.getElementById("research-a2a");
   const researchFuel = document.getElementById("research-fuel");
   const researchGuidance = document.getElementById("research-guidance");
+  const researchRocketDamage = document.getElementById("research-rocket-damage");
   const researchDrone = document.getElementById("research-drone");
   const researchDroneRange = document.getElementById("research-drone-range");
   const researchNuclear = document.getElementById("research-nuclear");
@@ -115,6 +116,7 @@
     { key: "a2aLevel", icon: "ico-a2a", name: "Air-to-air efficiency" },
     { key: "fuelCapacity", icon: "ico-fuel", name: "Rocket fuel capacity" },
     { key: "guidanceLevel", icon: "ico-guidance", name: "Rocket guidance" },
+    { key: "rocketDamageLevel", emoji: "💥", name: "Rocket blast radius", freeOnly: true },
     { key: "droneLevel", icon: "ico-drone", name: "Drone factory" },
     { key: "droneRangeLevel", icon: "ico-drone", name: "Drone range" },
   ];
@@ -124,9 +126,13 @@
     stat.className = "stat";
     stat.dataset.stat = item.key;
     stat.title = item.name;
+    const mark = item.emoji
+      ? '<span class="ico emoji" aria-hidden="true">' + item.emoji + "</span>"
+      : '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + item.icon + '"></use></svg>';
     stat.innerHTML =
-      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#' + item.icon + '"></use></svg>' +
+      mark +
       '<span class="meta"><b class="n" data-n="' + item.key + '">0</b><span class="name">' + item.name + "</span></span>";
+    if (item.freeOnly) stat.hidden = true;
     row.appendChild(stat);
   }
 
@@ -163,6 +169,7 @@
       a2aLevel: ruler.a2aLevel || 0,
       fuelCapacity: B.fuelCapacity(ruler),
       guidanceLevel: B.guidanceLevel(ruler),
+      rocketDamageLevel: B.rocketDamageLevel(ruler),
       droneLevel: ruler.droneLevel || 0,
       droneRangeLevel: B.droneRangeLevel(ruler),
     };
@@ -650,8 +657,25 @@
   });
 
   function paintResearch(ruler) {
-    if (match && match.mode === "free") {
+    const free = match && match.mode === "free";
+    researchRocketDamage.hidden = !free;
+    statsPanel.querySelector('[data-stat="rocketDamageLevel"]').hidden = !free;
+    enemyPanel.querySelector('[data-stat="rocketDamageLevel"]').hidden = !free;
+    if (free) {
       researchNuclear.hidden = true;
+      const level = B.rocketDamageLevel(ruler);
+      if (B.rocketDamageMaxed(ruler)) {
+        researchRocketDamage.textContent = "💥 Rocket blast radius (" + level + ")";
+        researchRocketDamage.disabled = true;
+        researchRocketDamage.title = "Rocket blasts reach " + B.rocketBlastRadius(ruler) + ".";
+      } else {
+        const next = level + 1;
+        const cost = B.rocketDamageCost(ruler);
+        const radius = B.rocketBlastRadiusAt(next);
+        researchRocketDamage.textContent = "💥 Rocket blast radius (" + next + " · " + cost + ")";
+        researchRocketDamage.disabled = false;
+        researchRocketDamage.title = "Raise rocket blast radius to " + radius + " for " + cost + " gold.";
+      }
     } else if (ruler.nuclearProgram) {
       researchNuclear.textContent = "Nuclear program";
       researchNuclear.disabled = true;
@@ -773,6 +797,13 @@
   researchGuidance.addEventListener("click", function () {
     if (!match) return;
     const error = B.playerResearch(match, "guidance");
+    if (error) match.log = error;
+    refresh();
+  });
+
+  researchRocketDamage.addEventListener("click", function () {
+    if (!match) return;
+    const error = B.playerResearch(match, "rocketDamage");
     if (error) match.log = error;
     refresh();
   });

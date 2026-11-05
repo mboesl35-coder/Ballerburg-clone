@@ -120,6 +120,12 @@
     droneCost: story.droneCost,
     fuelCapacityCost: story.fuelCapacityCost,
     guidanceCost: story.guidanceCost,
+    // Rocket blast radius. Free Game only.
+    // Costs: 100, 200, 300, 500. Radii: 26, 30, 34, 42.
+    // Unresearched rockets stay at blastRadius. Drones stay at half of that.
+    // Story Mode has no such research.
+    rocketDamageCosts: [100, 200, 300, 500],
+    rocketDamageRadii: [26, 30, 34, 42],
     a2aCost: story.a2aCost,
     droneResearchCost: story.droneResearchCost,
     droneRangeCost: story.droneRangeCost,

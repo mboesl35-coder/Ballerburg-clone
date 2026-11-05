@@ -791,9 +791,10 @@
         let line;
         let blast = null;
         if (hit.type === "block" || hit.type === "ground") {
-          blast = B.applyBlast(match, hit.x, hit.y);
+          const radius = B.rocketBlastRadius(match.rulers[match.turn]);
+          blast = B.applyBlast(match, hit.x, hit.y, radius);
           const debris = blast.keeps.length ? "gold" : hit.type === "ground" ? "ground" : false;
-          explode(match, hit.x, hit.y, debris);
+          explode(match, hit.x, hit.y, debris, radius / B.BALANCE.blastRadius);
           cryIfHomes(blast, hit.x);
           line = describeBlast(blast, hit);
         } else {
@@ -972,6 +973,13 @@
         ? "Rocket fuel spread is now ±" + spread + "."
         : "Rocket guidance is now exact.";
       refreshPreview(match);
+    } else if (kind === "rocketDamage") {
+      if (match.mode !== "free") return "Rocket blast radius is not part of this game.";
+      if (B.rocketDamageMaxed(ruler)) return "Rocket blast radius is already at its peak.";
+      const cost = B.rocketDamageCost(ruler);
+      if (!B.spend(ruler, cost)) return "Not enough gold.";
+      ruler.rocketDamageLevel = B.rocketDamageLevel(ruler) + 1;
+      match.log = "Rocket blast radius is now level " + ruler.rocketDamageLevel + ". Blasts reach " + B.rocketBlastRadius(ruler) + ".";
     } else if (kind === "drone") {
       if (B.droneFactoryMaxed(ruler)) return "The drone factory is already at its peak.";
       const cost = B.droneFactoryCost();

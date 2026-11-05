@@ -20,6 +20,7 @@
       a2aLevel: 0,
       fuelLevel: mode !== "free" && side === "right" ? b.powderMax - b.powderBase : 0,
       guidanceLevel: 0,
+      rocketDamageLevel: 0,
       nuclearProgram: false,
       nukes: 0,
       targetRockets: true,
@@ -90,6 +91,30 @@
 
   B.guidanceResearchCost = function guidanceResearchCost() {
     return B.prices().guidanceCost;
+  };
+
+  B.rocketDamageLevel = function rocketDamageLevel(ruler) {
+    return ruler && ruler.rocketDamageLevel ? ruler.rocketDamageLevel : 0;
+  };
+
+  B.rocketDamageMaxed = function rocketDamageMaxed(ruler) {
+    return B.rocketDamageLevel(ruler) >= B.FREE_PRICES.rocketDamageCosts.length;
+  };
+
+  B.rocketDamageCost = function rocketDamageCost(ruler) {
+    const costs = B.FREE_PRICES.rocketDamageCosts;
+    const level = B.rocketDamageLevel(ruler);
+    return costs[Math.min(level, costs.length - 1)];
+  };
+
+  B.rocketBlastRadiusAt = function rocketBlastRadiusAt(level) {
+    if (!level) return B.BALANCE.blastRadius;
+    const radii = B.FREE_PRICES.rocketDamageRadii;
+    return radii[Math.min(level, radii.length) - 1];
+  };
+
+  B.rocketBlastRadius = function rocketBlastRadius(ruler) {
+    return B.rocketBlastRadiusAt(B.rocketDamageLevel(ruler));
   };
 
   B.droneFactoryLevel = function droneFactoryLevel(ruler) {

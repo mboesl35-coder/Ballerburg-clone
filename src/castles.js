@@ -478,9 +478,10 @@
     return true;
   };
 
-  // Player mines stand at the left edge of the map, with open ground between them.
+  // Mines stand on the outer plain, with open ground between them.
+  // The left line starts at the left edge. The right line starts at the right edge.
   B.placeMine = function placeMine(castle) {
-    if (!castle || castle.side !== "left") return false;
+    if (!castle || (castle.side !== "left" && castle.side !== "right")) return false;
     const b = B.BALANCE;
     const mines = castle.mines || (castle.mines = []);
     const standing = mines.filter((mine) => mine.type === "tower");

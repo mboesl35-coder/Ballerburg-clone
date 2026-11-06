@@ -2053,27 +2053,165 @@
     ctx.restore();
   }
 
-  function drawSpreadBounds(ctx, low, high) {
-    if (!low || !high || low.length < 2 || high.length < 2) return;
-    ctx.save();
+  // Free Game aim keeps this much of each flight curve at full strength.
+  // The rest fades to nothing, so the landing point is a guess.
+  const FREE_AIM_SHOWN = 2 / 3;
+
+  function pathLengths(points) {
+    const lens = new Array(points.length);
+    lens[0] = 0;
+    for (let i = 1; i < points.length; i++) {
+      lens[i] = lens[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    }
+    return lens;
+  }
+
+  function aimAlpha(frac) {
+    if (frac <= FREE_AIM_SHOWN) return 1;
+    return Math.max(0, (1 - frac) / (1 - FREE_AIM_SHOWN));
+  }
+
+  function pointAlong(points, lens, frac) {
+    const total = lens[lens.length - 1];
+    if (!(total > 0)) return { x: points[0].x, y: points[0].y };
+    const target = total * Math.max(0, Math.min(1, frac));
+    let lo = 1;
+    let hi = points.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (lens[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    const span = lens[lo] - lens[lo - 1];
+    const t = span > 0 ? (target - lens[lo - 1]) / span : 0;
+    return {
+      x: points[lo - 1].x + (points[lo].x - points[lo - 1].x) * t,
+      y: points[lo - 1].y + (points[lo].y - points[lo - 1].y) * t,
+    };
+  }
+
+  function pointsUntil(points, lens, frac) {
+    const total = lens[lens.length - 1];
+    const target = total * frac;
+    const out = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      if (lens[i] >= target) {
+        out.push(pointAlong(points, lens, frac));
+        return out;
+      }
+      out.push(points[i]);
+    }
+    return out;
+  }
+
+  function tracePoints(ctx, points) {
+    if (!points.length) return;
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  }
+
+  function fillSpread(ctx, low, high) {
     ctx.beginPath();
     ctx.moveTo(high[0].x, high[0].y);
     for (let i = 1; i < high.length; i++) ctx.lineTo(high[i].x, high[i].y);
     for (let i = low.length - 1; i >= 0; i--) ctx.lineTo(low[i].x, low[i].y);
     ctx.closePath();
-    ctx.fillStyle = "rgba(24, 16, 10, 0.1)";
     ctx.fill();
+  }
+
+  function strokeSpread(ctx, points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+  }
+
+  function fillSpreadFaded(ctx, low, high, lowLens, highLens) {
+    const shownLow = pointsUntil(low, lowLens, FREE_AIM_SHOWN);
+    const shownHigh = pointsUntil(high, highLens, FREE_AIM_SHOWN);
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    tracePoints(ctx, shownHigh);
+    for (let i = shownLow.length - 1; i >= 0; i--) ctx.lineTo(shownLow[i].x, shownLow[i].y);
+    ctx.closePath();
+    ctx.fill();
+
+    const slices = 14;
+    const tail = 1 - FREE_AIM_SHOWN;
+    for (let s = 0; s < slices; s++) {
+      const a = FREE_AIM_SHOWN + tail * (s / slices);
+      const c = FREE_AIM_SHOWN + tail * ((s + 1) / slices);
+      const h0 = pointAlong(high, highLens, a);
+      const h1 = pointAlong(high, highLens, c);
+      const l1 = pointAlong(low, lowLens, c);
+      const l0 = pointAlong(low, lowLens, a);
+      ctx.globalAlpha = aimAlpha((a + c) / 2);
+      ctx.beginPath();
+      ctx.moveTo(h0.x, h0.y);
+      ctx.lineTo(h1.x, h1.y);
+      ctx.lineTo(l1.x, l1.y);
+      ctx.lineTo(l0.x, l0.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function strokeSpreadFaded(ctx, points, lens) {
+    const shown = pointsUntil(points, lens, FREE_AIM_SHOWN);
+    ctx.globalAlpha = 1;
+    ctx.lineDashOffset = 0;
+    strokeSpread(ctx, shown);
+
+    let offset = lens[lens.length - 1] * FREE_AIM_SHOWN;
+    const slices = 14;
+    const tail = 1 - FREE_AIM_SHOWN;
+    for (let s = 0; s < slices; s++) {
+      const a = FREE_AIM_SHOWN + tail * (s / slices);
+      const c = FREE_AIM_SHOWN + tail * ((s + 1) / slices);
+      const p0 = pointAlong(points, lens, a);
+      const p1 = pointAlong(points, lens, c);
+      ctx.globalAlpha = aimAlpha((a + c) / 2);
+      ctx.lineDashOffset = -offset;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.stroke();
+      offset += Math.hypot(p1.x - p0.x, p1.y - p0.y);
+    }
+  }
+
+  function drawSpreadBounds(ctx, low, high, fadeTail) {
+    if (!low || !high || low.length < 2 || high.length < 2) return;
+    ctx.save();
+    ctx.fillStyle = "rgba(24, 16, 10, 0.1)";
     ctx.strokeStyle = "rgba(24, 16, 10, 0.42)";
     ctx.lineWidth = 1.8;
     ctx.setLineDash([7, 7]);
-    ctx.beginPath();
-    ctx.moveTo(low[0].x, low[0].y);
-    for (let i = 1; i < low.length; i++) ctx.lineTo(low[i].x, low[i].y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(high[0].x, high[0].y);
-    for (let i = 1; i < high.length; i++) ctx.lineTo(high[i].x, high[i].y);
-    ctx.stroke();
+    if (fadeTail) {
+      const lowLens = pathLengths(low);
+      const highLens = pathLengths(high);
+      fillSpreadFaded(ctx, low, high, lowLens, highLens);
+      strokeSpreadFaded(ctx, low, lowLens);
+      strokeSpreadFaded(ctx, high, highLens);
+    } else {
+      fillSpread(ctx, low, high);
+      strokeSpread(ctx, low);
+      strokeSpread(ctx, high);
+    }
+    ctx.restore();
+  }
+
+  function drawAimDots(ctx, points, fadeTail) {
+    ctx.save();
+    ctx.fillStyle = "#000";
+    const lens = fadeTail ? pathLengths(points) : null;
+    const total = lens ? lens[lens.length - 1] : 0;
+    for (let i = 0; i < points.length; i += 3) {
+      const p = points[i];
+      ctx.globalAlpha = fadeTail && total > 0 ? aimAlpha(lens[i] / total) : 1;
+      if (ctx.globalAlpha <= 0) continue;
+      ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+    }
     ctx.restore();
   }
 
@@ -2907,12 +3045,9 @@
     }
 
     if (match.phase === "aim" && match.turn === "left" && match.preview) {
-      drawSpreadBounds(ctx, match.previewLow, match.previewHigh);
-      ctx.fillStyle = "#000";
-      for (let i = 0; i < match.preview.length; i += 3) {
-        const p = match.preview[i];
-        ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
-      }
+      const fadeAim = match.mode === "free";
+      drawSpreadBounds(ctx, match.previewLow, match.previewHigh, fadeAim);
+      drawAimDots(ctx, match.preview, fadeAim);
     }
 
     paintBits(ctx, match.fx);
@@ -2933,10 +3068,15 @@
     ctx.fillText("Enemy", match.right.originX + b.cols * b.block + 12, match.right.padY - 8);
     const wind = Math.round(match.wind);
     const arrow = wind === 0 ? "still" : wind > 0 ? "→".repeat(Math.min(4, Math.ceil(wind / 12))) : "←".repeat(Math.min(4, Math.ceil(-wind / 12)));
-    ctx.font = "18px Palatino, Georgia, serif";
+    // The battlefield is 4800px wide and then scaled to the window, so a fixed
+    // canvas font shrinks to a few pixels. Size the readout in screen pixels.
+    const windPx = Math.round(40 * (w / (ctx.canvas.clientWidth || w)));
+    ctx.font = windPx + "px Palatino, Georgia, serif";
     ctx.textAlign = "center";
-    ctx.fillText("Wind " + wind + "  " + arrow, w / 2, 32);
+    ctx.textBaseline = "top";
+    ctx.fillText("Wind " + wind + "  " + arrow, w / 2, Math.round(windPx * 0.15));
     ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
 
     if (match.droneAim && match.phase === "aim" && match.turn === "left") {
       drawDroneRange(ctx, match);

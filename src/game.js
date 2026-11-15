@@ -76,6 +76,9 @@
       phase: "aim",
       wind: Math.round((Math.random() * 2 - 1) * B.BALANCE.windMax * 0.6),
       shot: null,
+      swarm: [],
+      followups: [],
+      impactNotes: [],
       droneAim: null,
       wallTool: null,
       preview: [],
@@ -308,8 +311,29 @@
 
   function cue(name, x, scale) {
     const sfx = B.sfx;
-    if (!sfx || typeof sfx[name] !== "function") return;
-    sfx[name](x, scale);
+    if (!sfx || typeof sfx[name] !== "function") return null;
+    return sfx[name](x, scale);
+  }
+
+  function propStart(x) {
+    const sfx = B.sfx;
+    if (!sfx || typeof sfx.droneStart !== "function") return null;
+    return sfx.droneStart(x) || null;
+  }
+
+  function propMove(voice, x, along) {
+    if (!voice || !B.sfx || typeof B.sfx.droneMove !== "function") return;
+    B.sfx.droneMove(voice, x, along);
+  }
+
+  function propStop(voice, quick) {
+    if (!voice || !B.sfx || typeof B.sfx.droneStop !== "function") return;
+    B.sfx.droneStop(voice, quick);
+  }
+
+  function propStopAll() {
+    if (!B.sfx || typeof B.sfx.droneStop !== "function") return;
+    B.sfx.droneStop();
   }
 
   function cryIfHomes(blast, x) {
@@ -564,7 +588,10 @@
     if (match.phase !== "aim") return;
     match.droneAim = null;
     match.wallTool = null;
-    match.log = match.turn === "left" ? "You hold your fire." : "The enemy hesitates.";
+    const inbound = match.turn === "left" && match.swarm && match.swarm.length;
+    match.log = match.turn === "left"
+      ? (inbound ? "You hold your fire. Drones still inbound." : "You hold your fire.")
+      : "The enemy hesitates.";
     match.phase = "between";
     match.pause = 0.45;
   };
@@ -688,31 +715,62 @@
     return "The rocket flies into the void.";
   }
 
-  function finishDrone(match, line) {
-    cue("droneStop");
+  function silenceSwarm(match) {
+    const swarm = match.swarm || [];
+    for (let i = 0; i < swarm.length; i++) propStop(swarm[i].voice, true);
+    match.swarm = [];
+    match.impactNotes = [];
+  }
+
+  function declareWinner(match) {
+    silenceSwarm(match);
+    if (match.shot && match.shot.voice) propStop(match.shot.voice, true);
+    match.shot = null;
     const leftKeep = B.hasType(match.left, "keep");
     const rightKeep = B.hasType(match.right, "keep");
+    match.phase = "over";
+    match.winner = leftKeep ? "left" : rightKeep ? "right" : "draw";
+    match.detail = B.kingLine(match.left, match.right, match.rulers.left);
+  }
+
+  function flushImpacts(match) {
+    const notes = match.impactNotes;
+    if (!notes || !notes.length) return;
+    match.impactNotes = [];
+    for (let i = 0; i < notes.length; i++) {
+      noteCivilian(match, notes[i]);
+      noteOil(match, notes[i]);
+      noteReconstruction(match);
+    }
+  }
+
+  function finishDrone(match, result) {
+    propStop(match.shot && match.shot.voice);
+    if (result.loose) match.intercept = result.loose;
     match.shot = null;
-    match.log = line;
-    if (!leftKeep || !rightKeep) {
-      match.phase = "over";
-      match.winner = leftKeep ? "left" : rightKeep ? "right" : "draw";
-      match.detail = B.kingLine(match.left, match.right, match.rulers.left);
+    match.log = result.line;
+    if (result.gameOver) {
+      declareWinner(match);
       return;
+    }
+    if (result.blast) {
+      noteCivilian(match, result.blast);
+      noteOil(match, result.blast);
+      noteReconstruction(match);
     }
     match.phase = "aim";
     match.detail = sideStatus(match.rulers.left, match.left, match.right);
     refreshPreview(match);
   }
 
-  function advanceDrone(match, dt) {
-    const shot = match.shot;
+  // One drone step. A null return means it is still in the air.
+  function stepDrone(match, shot, dt) {
     const path = shot.path;
     const ice = shot.intercept;
     shot.index += dt * B.BALANCE.dronePace;
     const attackTip = ice && ice.success ? Math.min(shot.index, ice.meetAt) : shot.index;
     const heard = path[Math.max(0, Math.min(path.length - 1, Math.floor(attackTip)))];
-    if (heard) cue("droneMove", heard.x, path.length ? attackTip / path.length : 0);
+    if (heard) propMove(shot.voice, heard.x, path.length ? attackTip / path.length : 0);
     burn(match, path, shot, attackTip, false);
     if (ice && shot.index >= ice.launchAt) {
       announceIntercept(match, ice);
@@ -724,36 +782,91 @@
         const line = match.turn === "left"
           ? "The interceptor strikes your drone. Both explode."
           : "Your interceptor strikes the enemy drone. Both explode.";
-        finishDrone(match, line);
-        return;
+        return { line: line, blast: null, gameOver: false, loose: null };
       }
     }
-    if (shot.index < path.length) return;
+    if (shot.index >= path.length && B.continueDrone(match, shot) && shot.index < path.length) return null;
+    if (shot.index < path.length) return null;
     const hit = shot.hit;
     const at = hit && hit.x != null ? hit : path[path.length - 1];
-    const blast = B.applyBlast(match, at.x, at.y, B.BALANCE.blastRadius / 2);
+    const blast = B.applyBlast(match, at.x, at.y, B.BALANCE.blastRadius / 2, false);
     const debris = blast.keeps.length ? "gold" : hit.type === "ground" ? "ground" : false;
     explode(match, at.x, at.y, debris, 0.5);
     cryIfHomes(blast, at.x);
     let line = describeBlast(blast, hit, "drone");
+    let loose = null;
     if (ice && !ice.success) {
       line = "The interceptor misses. " + line;
-      if (ice.index >= 0 && ice.index < ice.path.length) match.intercept = ice;
+      if (ice.index >= 0 && ice.index < ice.path.length) loose = ice;
     }
     const leftKeep = B.hasType(match.left, "keep");
     const rightKeep = B.hasType(match.right, "keep");
-    if (leftKeep && rightKeep) {
-      noteCivilian(match, blast);
-      noteOil(match, blast);
-      noteReconstruction(match);
-    }
-    finishDrone(match, line);
+    return { line: line, blast: blast, gameOver: !leftKeep || !rightKeep, loose: loose };
   }
+
+  function advanceDrone(match, dt) {
+    const result = stepDrone(match, match.shot, dt);
+    if (!result) return;
+    finishDrone(match, result);
+  }
+
+  function advanceFollowups(match, dt) {
+    const extras = match.followups;
+    if (!extras || !extras.length) return;
+    for (let i = extras.length - 1; i >= 0; i--) {
+      const spare = extras[i];
+      spare.index += dt * B.BALANCE.rocketPace;
+      burn(match, spare.path, spare, spare.index, true);
+      if (spare.index >= spare.path.length) extras.splice(i, 1);
+    }
+  }
+
+  function advanceSwarm(match, dt) {
+    const swarm = match.swarm;
+    if (!swarm || !swarm.length) return;
+    let log = null;
+    let over = null;
+    for (let i = 0; i < swarm.length; ) {
+      const result = stepDrone(match, swarm[i], dt);
+      if (!result) {
+        i += 1;
+        continue;
+      }
+      propStop(swarm[i].voice);
+      if (result.loose) {
+        if (!match.followups) match.followups = [];
+        match.followups.push(result.loose);
+      }
+      if (result.blast) {
+        if (!match.impactNotes) match.impactNotes = [];
+        match.impactNotes.push(result.blast);
+      }
+      swarm.splice(i, 1);
+      if (result.gameOver) over = result.line;
+      else log = result.line;
+    }
+    if (over) {
+      match.log = over;
+      declareWinner(match);
+      return;
+    }
+    if (log) match.log = log;
+    if (!swarm.length && match.phase !== "fly") flushImpacts(match);
+  }
+
+  B.silenceFlights = function silenceFlights(match) {
+    if (!match) {
+      propStopAll();
+      return;
+    }
+    silenceSwarm(match);
+    if (match.shot && match.shot.voice) propStop(match.shot.voice, true);
+  };
 
   B.cancelDroneAim = function cancelDroneAim(match) {
     if (!match || !match.droneAim) return;
     match.droneAim = null;
-    match.log = "Drone attack cancelled.";
+    match.log = match.swarm && match.swarm.length ? "No more drones will launch." : "Drone attack cancelled.";
     refreshPreview(match);
   };
 
@@ -769,8 +882,8 @@
     if (ruler.drones < 1) return "No attack drones ready.";
     const home = B.droneHome(match.left);
     match.droneAim = { x: home.x, y: home.y };
-    match.log = "Click the map to send the drone.";
-    match.detail = "It flies from above your castle and explodes on anything in the way.";
+    match.log = "Click the map to send a drone.";
+    match.detail = "Each click sends one. They fly together, and each explodes on anything in the way.";
     refreshPreview(match);
     return null;
   };
@@ -787,15 +900,44 @@
     if (!flown.path.length) return "The drone has nowhere to fly.";
     ruler.drones -= 1;
     if (side === "left") match.dronesFired = (match.dronesFired || 0) + 1;
+    const intercept = armIntercept(match, side, flown.path, "drone");
+    const drone = {
+      path: flown.path,
+      hit: flown.hit,
+      index: 0,
+      emitted: 0,
+      drone: true,
+      intercept: intercept,
+      voice: propStart(flown.path[0].x),
+      side: side,
+      course: flown.course,
+    };
+    if (side === "left") {
+      if (!match.swarm) match.swarm = [];
+      match.swarm.push(drone);
+      const left = ruler.drones;
+      if (left > 0) {
+        const noun = left === 1 ? "One more is ready." : left + " more are ready.";
+        match.log = "A drone is away. " + noun;
+        match.detail = "Click the map to send another.";
+      } else {
+        match.droneAim = null;
+        match.preview = [];
+        match.previewLow = [];
+        match.previewHigh = [];
+        match.log = "Your last drone is away.";
+        match.detail = sideStatus(ruler, match.left, match.right);
+        refreshPreview(match);
+      }
+      return null;
+    }
     match.droneAim = null;
     match.preview = [];
     match.previewLow = [];
     match.previewHigh = [];
-    const intercept = armIntercept(match, side, flown.path, "drone");
-    match.shot = { path: flown.path, hit: flown.hit, index: 0, emitted: 0, drone: true, intercept: intercept };
+    match.shot = drone;
     match.phase = "fly";
-    match.log = side === "left" ? "Your drone is in flight." : "The enemy sends a drone.";
-    cue("droneStart", flown.path[0].x);
+    match.log = "The enemy sends a drone.";
     return null;
   };
 
@@ -815,6 +957,9 @@
       burn(match, spare.path, spare, spare.index, true);
       if (spare.index >= spare.path.length) match.intercept = null;
     }
+    advanceFollowups(match, dt);
+    advanceSwarm(match, dt);
+    if (match.phase === "over") return;
 
     if (match.phase === "fly" && match.shot) {
       const shot = match.shot;
@@ -865,6 +1010,7 @@
         const leftKeep = B.hasType(match.left, "keep");
         const rightKeep = B.hasType(match.right, "keep");
         if (!leftKeep || !rightKeep) {
+          silenceSwarm(match);
           match.phase = "over";
           match.winner = leftKeep ? "left" : rightKeep ? "right" : "draw";
           match.detail = B.kingLine(match.left, match.right, match.rulers.left);
@@ -881,6 +1027,8 @@
         match.pause = 0.7;
       }
     } else if (match.phase === "between") {
+      if (match.swarm && match.swarm.length) return;
+      flushImpacts(match);
       if (match.pendingCivilian || match.pendingGrant || match.pendingOil) return;
       match.pause -= dt;
       if (match.pause <= 0) {

@@ -359,7 +359,7 @@
     const buyDrone = document.getElementById("buy-drone");
     buyDrone.hidden = factory < 1;
     buyDrone.disabled = factory < 1 || built >= factory;
-    buyDrone.title = "One drone, after you have a drone factory. You can buy only as many as the factory level each turn. Plan the attack, then click the map. The blast is half a rocket's, and the enemy can intercept it.";
+    buyDrone.title = "One drone, after you have a drone factory. You can buy only as many as the factory level each turn. Plan the attack, then click the map once for each drone. They fly at the same time. The blast is half a rocket's, and the enemy can intercept it.";
     if (factory > 0) {
       buyDrone.title += " Built " + built + " of " + factory + " this turn.";
     }
@@ -579,6 +579,7 @@
     ultimatum.hidden = true;
     match.phase = "over";
     match.winner = "surrender";
+    if (B.silenceFlights) B.silenceFlights(match);
     match.shot = null;
     match.droneAim = null;
     match.wallTool = null;

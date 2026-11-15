@@ -145,13 +145,10 @@
     return Math.abs(targetX - start.x) <= B.droneRange(ruler);
   };
 
-  // A guided drone flies straight at first, then curves down into its target
-  // and detonates on the first thing it meets.
-  B.flyDrone = function flyDrone(match, side, targetX, targetY) {
+  // Walk the drone curve from a step already flown. Stops at the first thing
+  // that is solid now, so a later drone can fly through a hole a previous one opened.
+  function traceDrone(match, side, start, dx, dy, fromStep) {
     const b = B.BALANCE;
-    const start = B.droneHome(match[side]);
-    const dx = targetX - start.x;
-    const dy = targetY - start.y;
     const step = b.droneStep;
     const samples = Math.max(32, Math.ceil((Math.abs(dx) + Math.abs(dy)) / 3));
     const xs = new Array(samples + 1);
@@ -168,7 +165,11 @@
     }
     const total = lens[samples];
     const steps = Math.max(1, Math.ceil(total / step));
-    const path = [{ x: start.x, y: start.y }];
+    const path = fromStep > 0 ? [] : [{ x: start.x, y: start.y }];
+    const begin = fromStep > 0 ? fromStep + 1 : 1;
+    if (begin > steps) {
+      return { path: path, hit: { type: "target", x: start.x + dx, y: start.y + dy }, step: steps };
+    }
     const bins = colliderIndex(match);
     let cursor = 0;
     for (let i = 1; i <= steps; i++) {
@@ -178,12 +179,59 @@
       const frac = seg > 0 ? (targetLen - lens[cursor]) / seg : 0;
       const x = xs[cursor] + (xs[cursor + 1] - xs[cursor]) * frac;
       const y = ys[cursor] + (ys[cursor + 1] - ys[cursor]) * frac;
+      if (i < begin) continue;
+      const ground = match.terrain.yAt(x);
+      if (y >= ground) {
+        path.push({ x: x, y: ground });
+        return { path: path, hit: { type: "ground", x: x, y: ground }, step: i };
+      }
+      // Past the muzzle grace, so a drone can strike its own castle.
+      const struck = strikeBlock(match, side, 99, x, y, bins);
+      if (struck) {
+        path.push({ x: x, y: y });
+        return { path: path, hit: struck, step: i };
+      }
+      path.push({ x: x, y: y });
+      if (x < -60 || x > b.viewW + 60 || y > b.viewH + 40 || y < -80) {
+        return { path: path, hit: { type: "miss", x: x, y: y }, step: i };
+      }
+    }
+    return { path: path, hit: { type: "target", x: start.x + dx, y: start.y + dy }, step: steps };
+  }
+
+  // A guided drone flies straight at first, then curves down into its target
+  // and detonates on the first thing it meets.
+  B.flyDrone = function flyDrone(match, side, targetX, targetY) {
+    const start = B.droneHome(match[side]);
+    const dx = targetX - start.x;
+    const dy = targetY - start.y;
+    const traced = traceDrone(match, side, start, dx, dy, 0);
+    traced.course = { start: start, dx: dx, dy: dy, step: traced.step };
+    return traced;
+  };
+
+  // Past the aim point, in the direction the curve was traveling when it arrived.
+  function extendDrone(match, side, start, dx, dy, from) {
+    const b = B.BALANCE;
+    const end = droneCurve(start, dx, dy, 1);
+    const ahead = droneCurve(start, dx, dy, 1.02);
+    let vx = ahead.x - end.x;
+    let vy = ahead.y - end.y;
+    const mag = Math.hypot(vx, vy) || 1;
+    vx = vx / mag * b.droneStep;
+    vy = vy / mag * b.droneStep;
+    const path = [];
+    let x = from.x;
+    let y = from.y;
+    const bins = colliderIndex(match);
+    for (let i = 0; i < 420; i++) {
+      x += vx;
+      y += vy;
       const ground = match.terrain.yAt(x);
       if (y >= ground) {
         path.push({ x: x, y: ground });
         return { path: path, hit: { type: "ground", x: x, y: ground } };
       }
-      // Past the muzzle grace, so a drone can strike its own castle.
       const struck = strikeBlock(match, side, 99, x, y, bins);
       if (struck) {
         path.push({ x: x, y: y });
@@ -194,6 +242,37 @@
         return { path: path, hit: { type: "miss", x: x, y: y } };
       }
     }
-    return { path: path, hit: { type: "target", x: targetX, y: targetY } };
+    return { path: path, hit: { type: "miss", x: x, y: y } };
+  }
+
+  function appendPath(path, extra) {
+    for (let i = 0; i < extra.length; i++) path.push(extra[i]);
+  }
+
+  // The recorded impact is empty. Finish the original curve, then keep going
+  // until something solid or the ground. Returns true when the flight grew.
+  B.continueDrone = function continueDrone(match, shot) {
+    const course = shot && shot.course;
+    const hit = shot && shot.hit;
+    if (!course || !hit || hit.type !== "block" || hit.x == null) return false;
+    const bins = colliderIndex(match);
+    const still = strikeBlock(match, shot.side, 99, hit.x, hit.y, bins);
+    if (still) {
+      if (still.block !== hit.block) shot.hit = still;
+      return false;
+    }
+    const traced = traceDrone(match, shot.side, course.start, course.dx, course.dy, course.step);
+    course.step = traced.step;
+    appendPath(shot.path, traced.path);
+    const landed = traced.hit.type === "block" || traced.hit.type === "ground" || traced.hit.type === "miss";
+    if (landed && traced.path.length) {
+      shot.hit = traced.hit;
+      return true;
+    }
+    const from = shot.path[shot.path.length - 1];
+    const extra = extendDrone(match, shot.side, course.start, course.dx, course.dy, from);
+    appendPath(shot.path, extra.path);
+    shot.hit = extra.hit;
+    return extra.path.length > 0;
   };
 })();

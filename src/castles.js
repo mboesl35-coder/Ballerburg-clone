@@ -438,7 +438,8 @@
     if (list.indexOf(side) < 0) list.push(side);
   }
 
-  B.applyBlast = function applyBlast(match, x, y, radius) {
+  // dig is false for drones: same castle and building damage, no ground crater.
+  B.applyBlast = function applyBlast(match, x, y, radius, dig) {
     if (radius == null) radius = B.BALANCE.blastRadius;
     const report = { keeps: [], cannons: [], towers: [], rigs: [], rigLoss: { left: 0, right: 0 }, walls: [], patriots: [], houseLoss: { left: 0, right: 0 }, houseGone: { left: 0, right: 0 }, popLost: { left: 0, right: 0 }, popHomes: { left: 0, right: 0 }, factoryLevel: { left: null, right: null } };
     for (const castle of [match.left, match.right]) {
@@ -544,7 +545,7 @@
       }
       if (coverDirty) markCovered(castle.blocks);
     }
-    match.terrain.scoop(x, y, radius);
+    if (dig !== false) match.terrain.scoop(x, y, radius);
     return report;
   };
 

@@ -248,8 +248,9 @@
   }
 
   // A light-aircraft propeller: blade chops on a band of air, over a low engine.
-  // It follows the drone and fades out when the flight ends.
-  let prop = null;
+  // Each flying drone keeps its own voice, so several can be heard at once.
+  // The voice follows that drone and fades out when its flight ends.
+  const props = [];
   let propNoise = null;
   let propClip = null;
   let propPulse = null;
@@ -288,11 +289,29 @@
     panner.pan.value = amount;
   }
 
+  function crowdPeak(count) {
+    return 0.5 / Math.sqrt(Math.max(1, count));
+  }
+
+  function duckProps(peak) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    for (let i = 0; i < props.length; i++) {
+      const voice = props[i];
+      if (!voice.master || voice.stopped) continue;
+      try {
+        voice.master.gain.cancelScheduledValues(t);
+        const level = voice.master.gain.value;
+        voice.master.gain.setValueAtTime(level > 0.0001 ? level : 0.0001, t);
+        voice.master.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), t + 0.08);
+      } catch (err) {}
+    }
+  }
+
   function droneStart(x) {
-    if (!audio()) return;
-    droneStop(true);
+    if (!audio()) return null;
     propCurves();
-    const blade = vary(64, 0.03);
+    const blade = vary(64, 0.03) + props.length * 3.2;
     const t = ctx.currentTime;
     const nodes = [];
 
@@ -364,7 +383,7 @@
 
     const wobble = take(ctx.createOscillator());
     wobble.type = "sine";
-    wobble.frequency.value = 4.2;
+    wobble.frequency.value = vary(4.2, 0.12);
     const wobbleBlade = take(ctx.createGain());
     wobbleBlade.gain.value = 1.4;
     const wobbleBody = take(ctx.createGain());
@@ -376,8 +395,10 @@
     wobbleBody.connect(body.frequency);
 
     const master = take(ctx.createGain());
+    const peak = crowdPeak(props.length + 1);
     master.gain.setValueAtTime(0.0001, t);
-    master.gain.exponentialRampToValueAtTime(0.5, t + 0.07);
+    master.gain.exponentialRampToValueAtTime(peak, t + 0.07);
+    if (props.length) duckProps(peak);
     bodyGain.connect(master);
     toneGain.connect(master);
     chop.connect(master);
@@ -392,7 +413,7 @@
     wobble.start(t);
     noise.start(t);
 
-    prop = {
+    const voice = {
       master: master,
       panner: panner,
       blade: blade,
@@ -404,29 +425,31 @@
       noise: noise,
       wobble: wobble,
       nodes: nodes,
+      stopped: false,
     };
+    props.push(voice);
+    return voice;
   }
 
-  function droneMove(x, along) {
-    if (!prop || !ctx) return;
-    setPan(prop.panner, x);
+  function droneMove(voice, x, along) {
+    if (!voice || voice.stopped || !ctx) return;
+    setPan(voice.panner, x);
     const u = Math.max(0, Math.min(1, along || 0));
-    const blade = prop.blade + u * 8;
-    if (Math.abs(blade - prop.heard) < 0.4) return;
-    prop.heard = blade;
-    prop.pulse.frequency.value = blade;
-    prop.tone.frequency.value = blade;
-    prop.body.frequency.value = blade * 0.5;
-    prop.body2.frequency.value = blade * 0.5 * 1.007;
+    const blade = voice.blade + u * 8;
+    if (Math.abs(blade - voice.heard) < 0.4) return;
+    voice.heard = blade;
+    voice.pulse.frequency.value = blade;
+    voice.tone.frequency.value = blade;
+    voice.body.frequency.value = blade * 0.5;
+    voice.body2.frequency.value = blade * 0.5 * 1.007;
   }
 
-  function droneStop(quick) {
-    if (!prop || !ctx) {
-      prop = null;
-      return;
-    }
-    const voice = prop;
-    prop = null;
+  function fadeVoice(voice, quick, holdCrowd) {
+    if (!voice || voice.stopped) return;
+    voice.stopped = true;
+    const i = props.indexOf(voice);
+    if (i >= 0) props.splice(i, 1);
+    if (!ctx) return;
     const t = ctx.currentTime;
     const fade = quick ? 0.03 : 0.12;
     try {
@@ -437,10 +460,21 @@
     } catch (err) {}
     const end = t + fade + 0.03;
     const sources = [voice.body, voice.body2, voice.tone, voice.pulse, voice.noise, voice.wobble];
-    for (let i = 0; i < sources.length; i++) {
-      try { sources[i].stop(end); } catch (err) {}
+    for (let s = 0; s < sources.length; s++) {
+      try { sources[s].stop(end); } catch (err) {}
     }
     voice.noise.onended = function () { release(voice.nodes); };
+    if (!holdCrowd && props.length) duckProps(crowdPeak(props.length));
+  }
+
+  function droneStop(voice, quick) {
+    if (!voice || typeof voice !== "object") {
+      const all = props.slice();
+      props.length = 0;
+      for (let i = 0; i < all.length; i++) fadeVoice(all[i], voice === true, true);
+      return;
+    }
+    fadeVoice(voice, !!quick, false);
   }
 
   // Real vocal crowd scream when a residential building is hit.
@@ -463,9 +497,10 @@
   function guard(fn) {
     return function () {
       try {
-        fn.apply(null, arguments);
+        return fn.apply(null, arguments);
       } catch (err) {
         if (window.console) console.error(err);
+        return null;
       }
     };
   }

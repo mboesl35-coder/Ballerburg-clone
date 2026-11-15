@@ -3409,6 +3409,15 @@
 
     paintBits(ctx, match.fx);
 
+    const swarm = match.swarm || [];
+    for (let s = 0; s < swarm.length; s++) {
+      const flight = swarm[s];
+      if (!flight.path || !flight.path.length) continue;
+      const ice = flight.intercept;
+      const cap = ice && ice.success ? Math.min(flight.index, ice.meetAt) : flight.index;
+      drawDroneFlight(ctx, flight.path, cap, time);
+      if (ice) drawIntercept(ctx, ice, time);
+    }
     if (match.phase === "fly" && match.shot && match.shot.path.length) {
       const ice = match.shot.intercept;
       const cap = ice && ice.success ? Math.min(match.shot.index, ice.meetAt) : match.shot.index;
@@ -3418,6 +3427,8 @@
     const currentIce = match.shot && match.shot.intercept;
     if (currentIce) drawIntercept(ctx, currentIce, time);
     if (match.intercept && match.intercept !== currentIce) drawIntercept(ctx, match.intercept, time);
+    const followups = match.followups || [];
+    for (let s = 0; s < followups.length; s++) drawIntercept(ctx, followups[s], time);
 
     ctx.fillStyle = "#241c14";
     ctx.font = "16px Palatino, Georgia, serif";

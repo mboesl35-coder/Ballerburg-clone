@@ -47,11 +47,15 @@
   }
 
   B.createMatch = function createMatch(mapId, mode) {
+    cue("droneStop");
     mode = mode || "story";
     B.PRICES = mode === "free" ? B.FREE_PRICES : B.BALANCE;
     const terrain = B.createTerrain(mapId);
-    const left = B.createCastle("left", mode === "free" ? { style: "kremlin", brick: "blue" } : null);
-    const right = B.createCastle("right", { style: "kremlin", brick: "red" });
+    const free = mode === "free";
+    const left = B.createCastle("left", free ? { style: "kremlin", brick: "blue", seatKeep: true } : null);
+    const right = B.createCastle("right", free
+      ? { style: "kremlin", brick: "red", seatKeep: true }
+      : { style: "kremlin", brick: "red" });
     left.terrain = terrain;
     right.terrain = terrain;
     B.layoutCastle(left, terrain);
@@ -85,6 +89,11 @@
       winner: null,
       intercept: null,
       playerTurn: 0,
+      rocketsFired: 0,
+      dronesFired: 0,
+      residentialHits: 0,
+      mobilised: 0,
+      startPop: null,
       oilRigsDestroyed: 0,
       oilOutrageShown: false,
       pendingAllies: false,
@@ -94,6 +103,14 @@
     };
     match.rulers.left.population = peopleIn(left);
     match.rulers.right.population = peopleIn(right);
+    match.startPop = {
+      left: match.rulers.left.population,
+      right: match.rulers.right.population,
+    };
+    if (free) {
+      left.powder = B.fuelCapacity(match.rulers.left);
+      right.powder = B.fuelCapacity(match.rulers.right);
+    }
     return match;
   };
 
@@ -526,6 +543,7 @@
     castle.powder = powder;
     ruler.powder -= powder;
     ruler.balls -= 1;
+    if (side === "left") match.rocketsFired = (match.rocketsFired || 0) + 1;
     const spread = B.powderSpread(ruler);
     const actualPowder = spread > 0 ? powder + (Math.random() * 2 - 1) * spread : powder;
     const flown = B.fly(match, side, elevation, actualPowder, true);
@@ -615,28 +633,63 @@
     if (ruinedHomes(match.left) >= B.BALANCE.reconstructionAt) match.pendingGrant = true;
   }
 
+  function factorySentence(level, mine) {
+    const whose = mine ? "your drone factory" : "the enemy drone factory";
+    if (level < 1) return "destroys " + whose + ".";
+    return "sets " + whose + " back to level " + level + ".";
+  }
+
+  function factoryLine(blast, voice) {
+    const levels = blast && blast.factoryLevel;
+    if (!levels) return null;
+    const left = levels.left;
+    const right = levels.right;
+    if (left == null && right == null) return null;
+    if (left != null && right != null) {
+      const leftBit = voice + " " + factorySentence(left, true);
+      const rightBit = voice + " " + factorySentence(right, false);
+      return leftBit + " " + rightBit;
+    }
+    if (left != null) return voice + " " + factorySentence(left, true);
+    return voice + " " + factorySentence(right, false);
+  }
+
+  function withFactory(line, factory) {
+    if (!factory) return line;
+    if (!line) return factory;
+    if (line.indexOf("drone factory") >= 0) return line;
+    return line + " " + factory;
+  }
+
   function describeBlast(blast, hit, weapon) {
     const voice = weapon === "drone" ? "The drone" : "The rocket";
+    const factory = factoryLine(blast, voice);
     const king = sideLine(blast.keeps, voice + " kills your king.", voice + " kills the Orc Overlord.", voice + " kills your king and the Orc Overlord.");
-    if (king) return king;
+    if (king) return withFactory(king, factory);
     const cannon = sideLine(blast.cannons, voice + " hits your launcher.", voice + " hits the enemy launcher.", voice + " hits both launchers.");
-    if (cannon) return cannon;
+    if (cannon) return withFactory(cannon, factory);
     const house = houseLine(blast, voice);
-    if (house) return house;
+    if (house) return withFactory(house, factory);
     const tower = sideLine(blast.towers, voice + " hits your mine tower.", voice + " hits the enemy mine tower.", voice + " hits both mine towers.");
-    if (tower) return tower;
+    if (tower) return withFactory(tower, factory);
     const rig = sideLine(blast.rigs || [], voice + " hits your oil rig.", voice + " hits the enemy oil rig.", voice + " hits oil rigs on both sides.");
-    if (rig) return rig;
+    if (rig) return withFactory(rig, factory);
     const patriot = sideLine(blast.patriots || [], voice + " hits your patriot.", voice + " hits the enemy patriot.", voice + " hits both patriots.");
-    if (patriot) return patriot;
+    if (patriot) return withFactory(patriot, factory);
     const wall = sideLine(blast.walls, voice + " hits your wall.", voice + " hits the enemy wall.", voice + " hits both walls.");
-    if (wall) return wall;
+    if (wall) return withFactory(wall, factory);
+    if (factory) return factory;
+    if (hit && hit.block && hit.block.type === "ruin") {
+      const yours = hit.castle && hit.castle.side === "left";
+      return voice + (yours ? " hits your ruined oil rig." : " hits the ruined oil rig.");
+    }
     if (hit.type === "ground") return voice + " hits the hillside.";
     if (weapon === "drone") return voice + " explodes.";
     return "The rocket flies into the void.";
   }
 
   function finishDrone(match, line) {
+    cue("droneStop");
     const leftKeep = B.hasType(match.left, "keep");
     const rightKeep = B.hasType(match.right, "keep");
     match.shot = null;
@@ -658,6 +711,8 @@
     const ice = shot.intercept;
     shot.index += dt * B.BALANCE.dronePace;
     const attackTip = ice && ice.success ? Math.min(shot.index, ice.meetAt) : shot.index;
+    const heard = path[Math.max(0, Math.min(path.length - 1, Math.floor(attackTip)))];
+    if (heard) cue("droneMove", heard.x, path.length ? attackTip / path.length : 0);
     burn(match, path, shot, attackTip, false);
     if (ice && shot.index >= ice.launchAt) {
       announceIntercept(match, ice);
@@ -731,6 +786,7 @@
     const flown = B.flyDrone(match, side, x, y);
     if (!flown.path.length) return "The drone has nowhere to fly.";
     ruler.drones -= 1;
+    if (side === "left") match.dronesFired = (match.dronesFired || 0) + 1;
     match.droneAim = null;
     match.preview = [];
     match.previewLow = [];
@@ -739,6 +795,7 @@
     match.shot = { path: flown.path, hit: flown.hit, index: 0, emitted: 0, drone: true, intercept: intercept };
     match.phase = "fly";
     match.log = side === "left" ? "Your drone is in flight." : "The enemy sends a drone.";
+    cue("droneStart", flown.path[0].x);
     return null;
   };
 
@@ -861,10 +918,12 @@
       if (!B.hasType(castle, "cannon")) {
         if (!B.buyLauncher(castle)) return "No room for a launcher.";
         spendPopulation(ruler, castle, 1);
+        match.mobilised = (match.mobilised || 0) + 1;
         ruler.mobilised = true;
         match.log = "Your people mobilise a new launcher.";
       } else {
         spendPopulation(ruler, castle, 1);
+        match.mobilised = (match.mobilised || 0) + 1;
         ruler.balls += 1;
         ruler.mobilised = true;
         match.log = "Your people mobilise a rocket.";
@@ -982,16 +1041,19 @@
       match.log = "Rocket blast radius is now level " + ruler.rocketDamageLevel + ". Blasts reach " + B.rocketBlastRadius(ruler) + ".";
     } else if (kind === "drone") {
       if (B.droneFactoryMaxed(ruler)) return "The drone factory is already at its peak.";
-      const cost = B.droneFactoryCost();
+      const cost = B.droneFactoryCost(ruler);
       if (!B.spend(ruler, cost)) return "Not enough gold.";
       ruler.droneLevel = B.droneFactoryLevel(ruler) + 1;
+      B.syncDroneFactory(castle, ruler);
       const level = ruler.droneLevel;
       const noun = level === 1 ? "drone" : "drones";
-      match.log = "Drone factory is level " + level + ". You can buy " + level + " " + noun + " per turn.";
+      match.log = level === 1
+        ? "Drone factory is level 1. It stands behind your castle. You can buy 1 drone per turn."
+        : "Drone factory is level " + level + ". You can buy " + level + " " + noun + " per turn.";
     } else if (kind === "droneRange") {
       if (B.droneFactoryLevel(ruler) < 1) return "Research the drone factory first.";
       if (B.droneRangeMaxed(ruler)) return "Drone range is already at its peak.";
-      const cost = B.droneRangeCost();
+      const cost = B.droneRangeCost(ruler);
       if (!B.spend(ruler, cost)) return "Not enough gold.";
       ruler.droneRangeLevel = B.droneRangeLevel(ruler) + 1;
       match.log = "Drone range is now level " + ruler.droneRangeLevel + " (" + B.droneRange(ruler) + " m).";
@@ -1009,13 +1071,15 @@
   B.aiAct = function aiAct(match) {
     const ruler = match.rulers.right;
     const ai = match.mode === "free" ? B.FREE_AI : B;
+    const firstFreeTurn = match.mode === "free" && !match.aiTurns;
+    if (match.mode === "free") match.aiTurns = (match.aiTurns || 0) + 1;
     let notes = match.aiNotes;
     if (!match.aiSpent) {
       match.aiSpent = true;
       notes = ai.thinkEconomy(ruler, match.right);
       match.aiNotes = notes;
     }
-    if ((ruler.drones || 0) > 0) {
+    if (!firstFreeTurn && (ruler.drones || 0) > 0) {
       const target = ai.chooseDrone(match, "right");
       if (target) {
         const error = B.launchDrone(match, target.x, target.y);

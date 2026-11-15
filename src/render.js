@@ -1228,7 +1228,7 @@
   }
 
   function paintBunkerShell(ctx, castle) {
-    if (castle.style !== "kremlin") return;
+    if (!castle.buryKeep) return;
     const keep = castle.blocks.find((block) => block.type === "keep");
     if (!keep) return;
     const bunker = B.BUNKER;
@@ -1635,10 +1635,181 @@
     ctx.fill();
   }
 
+  function paintRigRuin(ctx, block) {
+    const w = block.w;
+    const h = block.h;
+    const foot = h - 3;
+    const steel = "#3e4c58";
+    const steelLite = "#8ea0ae";
+    const char = "#161310";
+    const rust = "#6a4030";
+    const tip = 4;
+    const lean = Math.round(w * 0.52);
+
+    ctx.save();
+    if (hash(block.x * 13 + (block.slot || 0) * 29) > 0.5) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+
+    ctx.fillStyle = "#100e0c";
+    ctx.beginPath();
+    ctx.ellipse(w * 0.58, foot + 1, w * 0.46, 3.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#2c261c";
+    ctx.fillRect(-1, foot - 4, w + 2, 7);
+    ctx.fillStyle = "#5a4a38";
+    ctx.fillRect(-1, foot - 4, w + 2, 1.5);
+    ctx.fillStyle = char;
+    ctx.fillRect(4, foot - 1, 7, 2);
+    ctx.fillRect(18, foot, 10, 2);
+    ctx.fillRect(w - 11, foot - 1, 6, 2);
+
+    ctx.fillStyle = "#3a2418";
+    ctx.beginPath();
+    ctx.moveTo(1, foot - 2);
+    ctx.lineTo(4, foot - 16);
+    ctx.lineTo(17, foot - 13);
+    ctx.lineTo(16, foot - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#c4552a";
+    ctx.fillRect(4, foot - 16, 12, 3);
+    ctx.fillStyle = char;
+    ctx.fillRect(5, foot - 12, 9, 2);
+    ctx.fillStyle = "#e6c56a";
+    ctx.fillRect(5, foot - 12, 4, 2);
+
+    ctx.fillStyle = "#1c140e";
+    ctx.beginPath();
+    ctx.ellipse(w - 10, foot - 4, 10, 4.2, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#4a3020";
+    ctx.beginPath();
+    ctx.ellipse(w - 13, foot - 7, 6, 3, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#6a5344";
+    ctx.fillRect(w - 16, foot - 9, 2, 5);
+
+    ctx.fillStyle = steelLite;
+    ctx.fillRect(18, foot - 12, 14, 5);
+    ctx.fillStyle = steel;
+    ctx.fillRect(18, foot - 12, 14, 2);
+    ctx.fillStyle = "#a33b24";
+    ctx.fillRect(23, foot - 11, 3, 3);
+
+    limb(ctx, 1, foot - 3, w + 6, foot - 15, 3.1, steel);
+    limb(ctx, 3, foot - 5, w + 4, foot - 16, 1.1, steelLite);
+
+    limb(ctx, 12, foot - 2, lean, tip, 3.6, steel);
+    limb(ctx, 12, foot - 2, lean, tip, 1.3, rust);
+    ctx.fillStyle = char;
+    ctx.beginPath();
+    ctx.moveTo(lean - 4, tip - 1);
+    ctx.lineTo(lean + 5, tip + 2);
+    ctx.lineTo(lean, tip + 8);
+    ctx.lineTo(lean - 6, tip + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    limb(ctx, w - 8, foot - 2, w - 16, foot - 24, 2.8, steel);
+    ctx.fillStyle = char;
+    ctx.fillRect(w - 19, foot - 26, 7, 4);
+
+    limb(ctx, lean, tip + 12, 5, foot - 18, 1.8, char);
+    limb(ctx, lean - 1, tip + 22, w - 14, foot - 20, 1.6, "#2c343c");
+
+    limb(ctx, 7, foot - 2, 16, foot - 8, 1.7, "#1a120e");
+    limb(ctx, 16, foot - 8, 28, foot - 4, 1.7, "#3a2e24");
+
+    ctx.fillStyle = "#5a5046";
+    ctx.beginPath();
+    ctx.moveTo(14, foot - 2);
+    ctx.lineTo(20, foot - 9);
+    ctx.lineTo(27, foot - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = rust;
+    ctx.fillRect(30, foot - 7, 5, 5);
+
+    ctx.restore();
+  }
+
+  function paintFactory(ctx, block, castle) {
+    const w = block.w;
+    const h = block.h;
+    const accent = castle && castle.side === "right" ? "#a33b24" : "#2f5f8a";
+    const steel = "#6e7882";
+    const steelDark = "#3e4650";
+    const roofH = 6;
+    const baseH = 4;
+    const bodyTop = roofH;
+    const bodyH = h - roofH - baseH;
+
+    ctx.fillStyle = "#2a3036";
+    ctx.fillRect(0, 1, w, roofH);
+    ctx.fillStyle = steelDark;
+    ctx.fillRect(0, 0, w, 2);
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, roofH - 2, w, 2);
+
+    ctx.fillStyle = steel;
+    ctx.fillRect(0, bodyTop, w, bodyH);
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.fillRect(0, bodyTop, 1, bodyH);
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.fillRect(w - 2, bodyTop, 2, bodyH);
+
+    ctx.fillStyle = "#e6c56a";
+    ctx.fillRect(3, bodyTop + 2, w - 6, 3);
+    ctx.fillStyle = "#1c140e";
+    for (let i = 0; i < 6; i++) ctx.fillRect(4 + i * 7, bodyTop + 2, 3, 3);
+
+    const doorW = 16;
+    const doorH = 14;
+    const doorX = Math.round((w - doorW) / 2);
+    const doorY = bodyTop + bodyH - doorH;
+    ctx.fillStyle = "#1c2228";
+    ctx.fillRect(doorX, doorY, doorW, doorH);
+    ctx.fillStyle = "#8d96a0";
+    ctx.fillRect(doorX, doorY, doorW, 1);
+    ctx.fillRect(doorX + doorW / 2, doorY, 1, doorH);
+    ctx.fillStyle = accent;
+    ctx.fillRect(doorX + doorW - 3, doorY + 7, 2, 2);
+
+    ctx.fillStyle = "#141a20";
+    ctx.fillRect(5, bodyTop + 8, 7, 5);
+    ctx.fillRect(w - 12, bodyTop + 8, 7, 5);
+    ctx.fillStyle = "#9ec8d8";
+    ctx.fillRect(6, bodyTop + 9, 5, 3);
+    ctx.fillRect(w - 11, bodyTop + 9, 5, 3);
+
+    ctx.fillStyle = "#4e4840";
+    ctx.fillRect(0, h - baseH, w, baseH);
+
+    ctx.strokeStyle = steelDark;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.72, 0);
+    ctx.lineTo(w * 0.72, -6);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(w * 0.72, -6, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#2a241c";
+    ctx.fillRect(8, -3, 14, 2);
+    ctx.fillRect(14, -5, 2, 6);
+  }
+
   function paintBlock(ctx, block, castle) {
     if (block.type === "house") paintHouse(ctx, block);
+    else if (block.type === "factory") paintFactory(ctx, block, castle);
     else if (block.type === "patriot") paintPatriot(ctx, block);
     else if (block.type === "rig") paintRig(ctx, block);
+    else if (block.type === "ruin") paintRigRuin(ctx, block);
     else if (block.type === "tower") paintTower(ctx, block);
     else if (block.type === "cannon") paintCannon(ctx, block, castle);
     else if (block.type === "keep") paintKing(ctx, block, castle);
@@ -2026,7 +2197,7 @@
       ctx.moveTo(x, y - arm);
       ctx.lineTo(x, y - gap);
       ctx.moveTo(x, y + gap);
-      ctx.lineTo(x + arm, y);
+      ctx.lineTo(x, y + arm);
       ctx.moveTo(x + ring, y);
       ctx.arc(x, y, ring, 0, Math.PI * 2);
       ctx.stroke();
@@ -2054,8 +2225,10 @@
   }
 
   // Free Game aim keeps this much of each flight curve at full strength.
-  // The rest fades to nothing, so the landing point is a guess.
-  const FREE_AIM_SHOWN = 2 / 3;
+  // It then fades, and nothing past FREE_AIM_GONE is drawn, so the landing
+  // point cannot be read off the curve.
+  const FREE_AIM_SHOWN = 1 / 2;
+  const FREE_AIM_GONE = 0.7;
 
   function pathLengths(points) {
     const lens = new Array(points.length);
@@ -2068,7 +2241,10 @@
 
   function aimAlpha(frac) {
     if (frac <= FREE_AIM_SHOWN) return 1;
-    return Math.max(0, (1 - frac) / (1 - FREE_AIM_SHOWN));
+    if (frac >= FREE_AIM_GONE) return 0;
+    const t = (frac - FREE_AIM_SHOWN) / (FREE_AIM_GONE - FREE_AIM_SHOWN);
+    const remain = 1 - t;
+    return remain * remain * remain;
   }
 
   function pointAlong(points, lens, frac) {
@@ -2137,15 +2313,17 @@
     ctx.fill();
 
     const slices = 14;
-    const tail = 1 - FREE_AIM_SHOWN;
+    const tail = FREE_AIM_GONE - FREE_AIM_SHOWN;
     for (let s = 0; s < slices; s++) {
       const a = FREE_AIM_SHOWN + tail * (s / slices);
       const c = FREE_AIM_SHOWN + tail * ((s + 1) / slices);
+      const alpha = aimAlpha((a + c) / 2);
+      if (alpha <= 0) continue;
       const h0 = pointAlong(high, highLens, a);
       const h1 = pointAlong(high, highLens, c);
       const l1 = pointAlong(low, lowLens, c);
       const l0 = pointAlong(low, lowLens, a);
-      ctx.globalAlpha = aimAlpha((a + c) / 2);
+      ctx.globalAlpha = alpha;
       ctx.beginPath();
       ctx.moveTo(h0.x, h0.y);
       ctx.lineTo(h1.x, h1.y);
@@ -2164,18 +2342,21 @@
 
     let offset = lens[lens.length - 1] * FREE_AIM_SHOWN;
     const slices = 14;
-    const tail = 1 - FREE_AIM_SHOWN;
+    const tail = FREE_AIM_GONE - FREE_AIM_SHOWN;
     for (let s = 0; s < slices; s++) {
       const a = FREE_AIM_SHOWN + tail * (s / slices);
       const c = FREE_AIM_SHOWN + tail * ((s + 1) / slices);
+      const alpha = aimAlpha((a + c) / 2);
       const p0 = pointAlong(points, lens, a);
       const p1 = pointAlong(points, lens, c);
-      ctx.globalAlpha = aimAlpha((a + c) / 2);
-      ctx.lineDashOffset = -offset;
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.lineTo(p1.x, p1.y);
-      ctx.stroke();
+      if (alpha > 0) {
+        ctx.globalAlpha = alpha;
+        ctx.lineDashOffset = -offset;
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+      }
       offset += Math.hypot(p1.x - p0.x, p1.y - p0.y);
     }
   }
@@ -2778,6 +2959,8 @@
       }
       const p = castle.patriot;
       if (p && x > p.x - 14 && x < p.x + p.w + 14) return false;
+      const foot = B.factoryFootprint(castle);
+      if (foot && x > foot.x - 14 && x < foot.x + foot.w + 14) return false;
     }
     const craters = match.terrain.craters || [];
     for (let i = 0; i < craters.length; i++) {
@@ -2951,6 +3134,168 @@
     }
   }
 
+  const FLAG_BLUE = {
+    deep: "#4a6278",
+    mid: "#6e92b0",
+    light: "#d5e1eb",
+    hem: "#3e5366",
+  };
+
+  const FLAG_RED = {
+    deep: "#7a5555",
+    mid: "#c17d7d",
+    light: "#eadcd9",
+    hem: "#684848",
+  };
+
+  // The map is drawn many times wider than the window. A flag sized to the
+  // tower would shrink to a speck, so grow it until the wind still reads,
+  // and stop before it covers the castle when the view is zoomed in.
+  function flagScale(ctx) {
+    const w = ctx.canvas.width;
+    const shown = ctx.canvas.clientWidth || w;
+    return Math.max(1.15, Math.min(2.6, (w / shown) * 0.55));
+  }
+
+  function flagAnchor(castle) {
+    let best = null;
+    const blocks = castle.blocks;
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      if (block.type !== "wall") continue;
+      if (!block.live || !B.hasCells(block.live)) continue;
+      const bounds = block._bounds;
+      const top = bounds ? bounds.minY : block.y;
+      const x = bounds ? (bounds.minX + bounds.maxX) * 0.5 : block.x + block.w * 0.5;
+      if (!best || top < best.y) best = { x, y: top };
+    }
+    return best;
+  }
+
+  function traceFlag(ctx, top, bot) {
+    ctx.beginPath();
+    ctx.moveTo(top[0].x, top[0].y);
+    for (let i = 1; i < top.length; i++) ctx.lineTo(top[i].x, top[i].y);
+    for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i].x, bot[i].y);
+    ctx.closePath();
+  }
+
+  function paintWindFlag(ctx, x, y, palette, wind, time, scale) {
+    const maxWind = B.BALANCE.windMax || 46;
+    const mag = Math.max(0, Math.min(1, Math.abs(wind) / maxWind));
+    const dir = wind < 0 ? -1 : 1;
+    // Fixed pennant. Wind lifts it off the pole; it does not grow.
+    const poleH = 16 * scale;
+    const hoistH = 11 * scale;
+    const length = 67 * scale;
+    const hang = 0.08 + Math.pow(1 - mag, 0.72) * 1.42;
+    const ax = dir * Math.cos(hang);
+    const ay = Math.sin(hang);
+    const nx = -ay;
+    const ny = ax;
+    const t = time * (0.0028 + mag * 0.0042);
+    const amp = (0.25 + mag * 5.2) * scale;
+    const steps = 8;
+    const hoistTopY = -poleH;
+    const hoistBotY = -poleH + hoistH;
+    const tipX = ax * length;
+    const tipY = -poleH + hoistH * 0.5 + ay * length;
+    const top = [];
+    const bot = [];
+
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps;
+      const flap = Math.sin(t * 2.2 - u * 5.8) * amp * u;
+      const belly = Math.sin(t * 3.6 - u * 9.4) * amp * 0.55 * Math.sin(u * Math.PI);
+      top.push({
+        x: (tipX) * u + nx * (flap + belly),
+        y: hoistTopY + (tipY - hoistTopY) * u + ny * (flap + belly),
+      });
+      bot.push({
+        x: tipX * u + nx * (flap - belly),
+        y: hoistBotY + (tipY - hoistBotY) * u + ny * (flap - belly),
+      });
+    }
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    const shaft = Math.max(2, 1.55 * scale);
+    const plant = 6;
+    ctx.strokeStyle = "#1c140e";
+    ctx.lineWidth = shaft;
+    ctx.beginPath();
+    ctx.moveTo(0, plant);
+    ctx.lineTo(0, -poleH);
+    ctx.stroke();
+    ctx.strokeStyle = "#c4b49a";
+    ctx.lineWidth = Math.max(0.8, scale * 0.42);
+    ctx.beginPath();
+    ctx.moveTo(-shaft * 0.18, plant);
+    ctx.lineTo(-shaft * 0.18, -poleH);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(ax * 1.4 * scale, 2.4 * scale);
+    traceFlag(ctx, top, bot);
+    ctx.fillStyle = "rgba(28, 22, 16, 0.2)";
+    ctx.fill();
+    ctx.restore();
+
+    traceFlag(ctx, top, bot);
+    const grad = ctx.createLinearGradient(0, hoistTopY, tipX, tipY);
+    grad.addColorStop(0, palette.light);
+    grad.addColorStop(0.2, palette.mid);
+    grad.addColorStop(0.62, palette.mid);
+    grad.addColorStop(1, palette.deep);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.save();
+    ctx.clip();
+    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = palette.deep;
+    ctx.lineWidth = Math.max(1.1, 1.15 * scale);
+    for (let i = 2; i < top.length - 1; i += 2) {
+      ctx.beginPath();
+      ctx.moveTo(top[i].x, top[i].y);
+      ctx.lineTo(bot[i].x, bot[i].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    traceFlag(ctx, top, bot);
+    ctx.strokeStyle = palette.hem;
+    ctx.lineWidth = Math.max(1, 0.85 * scale);
+    ctx.stroke();
+
+    ctx.fillStyle = "#d7b56a";
+    ctx.beginPath();
+    ctx.arc(0, -poleH, Math.max(1.5, 1.55 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f3e6c4";
+    ctx.beginPath();
+    ctx.arc(-0.35 * scale, -poleH - 0.45 * scale, Math.max(0.55, 0.55 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function paintCastleFlags(ctx, match, time) {
+    if (!match || match.mode !== "free") return;
+    const scale = flagScale(ctx);
+    const wind = match.wind || 0;
+    const castles = [match.left, match.right];
+    for (let i = 0; i < castles.length; i++) {
+      const castle = castles[i];
+      const anchor = flagAnchor(castle);
+      if (!anchor) continue;
+      const palette = castle.side === "left" ? FLAG_BLUE : FLAG_RED;
+      paintWindFlag(ctx, anchor.x, anchor.y, palette, wind, time, scale);
+    }
+  }
+
   B.drawScene = function drawScene(ctx, match, time) {
     const b = B.BALANCE;
     const w = b.viewW;
@@ -2981,6 +3326,14 @@
         ctx.ellipse(gx, match.terrain.yAt(gx) + 2, house.w * bulk, 3.5, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+      const factory = castle.droneFactory;
+      if (factory && factory.type === "factory") {
+        const gx = factory.x + factory.w / 2;
+        ctx.fillStyle = "rgba(36, 28, 18, 0.2)";
+        ctx.beginPath();
+        ctx.ellipse(gx, match.terrain.yAt(gx) + 2, factory.w * 0.42, 3.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       const mines = castle.mines || [];
       for (let i = 0; i < mines.length; i++) {
         const mine = mines[i];
@@ -2994,11 +3347,12 @@
       const rigs = castle.rigs || [];
       for (let i = 0; i < rigs.length; i++) {
         const rig = rigs[i];
-        if (rig.type !== "rig") continue;
+        if (rig.type !== "rig" && rig.type !== "ruin") continue;
         const gx = rig.x + rig.w / 2;
         ctx.fillStyle = "rgba(36, 28, 18, 0.22)";
         ctx.beginPath();
-        ctx.ellipse(gx, match.terrain.yAt(gx) + 2, rig.w * 0.46, 3.4, 0, 0, Math.PI * 2);
+        const bulk = rig.type === "ruin" ? 0.36 : 0.46;
+        ctx.ellipse(gx, match.terrain.yAt(gx) + 2, rig.w * bulk, 3.4, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -3006,6 +3360,7 @@
     for (const castle of [match.left, match.right]) {
       paintBunkerShell(ctx, castle);
       for (const house of castle.houses) blit(ctx, house, castle);
+      if (castle.droneFactory) blit(ctx, castle.droneFactory, castle);
       const ordered = castle.blocks.slice().sort((a, c) => a.r - c.r || a.c - c.c);
       for (const block of ordered) {
         if (block.type !== "cannon" && block.type !== "keep") blit(ctx, block, castle);
@@ -3017,6 +3372,8 @@
         if (block.type === "cannon") blit(ctx, block, castle);
       }
     }
+
+    paintCastleFlags(ctx, match, time);
 
     ctx.strokeStyle = "#3f562b";
     ctx.lineWidth = 1;

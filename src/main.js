@@ -28,6 +28,8 @@
   const detail = document.getElementById("detail");
   const angle = document.getElementById("angle");
   const powder = document.getElementById("powder");
+  const fuelMeter = document.getElementById("fuel-meter");
+  const fuelShort = document.getElementById("fuel-short");
   const angleVal = document.getElementById("angle-val");
   const powderVal = document.getElementById("powder-val");
   const statsPanel = document.getElementById("stats");
@@ -189,6 +191,35 @@
     });
   }
 
+  function incomeTitle(ruler, castle) {
+    const towers = castle ? B.towerCount(castle) : 0;
+    const oils = castle ? B.oilCount(castle) : 0;
+    const towerGold = towers * b.towerIncome;
+    const oilGold = oils * b.oilIncome;
+    const popGold = B.turnIncome(ruler, castle) - towerGold - oilGold;
+    const parts = [];
+    if (popGold > 0) parts.push("Population earns " + popGold + " gold.");
+    if (towers > 0) {
+      const noun = towers === 1 ? "mine earns " : "mines earn ";
+      parts.push(towers + " " + noun + towerGold + " gold.");
+    }
+    if (oils > 0) {
+      const noun = oils === 1 ? "oil rig earns " : "oil rigs earn ";
+      parts.push(oils + " " + noun + oilGold + " gold.");
+    }
+    if (!parts.length) return "No income this turn.";
+    return parts.join(" ");
+  }
+
+  function paintIncome(panel, ruler, castle) {
+    const stat = panel.querySelector('[data-stat="income"]');
+    if (!stat) return;
+    const title = incomeTitle(ruler, castle);
+    if (stat.title === title) return;
+    stat.title = title;
+    stat.setAttribute("aria-label", "Income. " + title);
+  }
+
   function oilTitle(count, destroyed) {
     const each = b.oilIncome;
     let text;
@@ -234,19 +265,46 @@
 
   function priceButtons() {
     const p = B.prices();
-    document.getElementById("buy-ball").textContent = "Rocket (" + p.ballCost + ")";
-    document.getElementById("buy-powder").textContent = "Rocket Fuel (" + p.powderCost + ")";
-    document.getElementById("buy-launcher").textContent = "Buy launcher (" + p.launcherCost + ")";
-    document.getElementById("wall").textContent = "Wall (" + p.wallCost + ")";
-    document.getElementById("tower").textContent = "Mine tower (" + p.towerCost + ")";
-    document.getElementById("buy-patriot").textContent = "Patriot (" + p.patriotCost + ")";
-    document.getElementById("buy-a2a").textContent = "Air-to-air (" + p.interceptorCost + ")";
+    const ball = document.getElementById("buy-ball");
+    const powderBtn = document.getElementById("buy-powder");
+    const launcher = document.getElementById("buy-launcher");
+    const wall = document.getElementById("wall");
+    const tower = document.getElementById("tower");
+    const patriot = document.getElementById("buy-patriot");
+    const a2a = document.getElementById("buy-a2a");
+    ball.textContent = "Rocket (" + p.ballCost + ")";
+    powderBtn.textContent = "Rocket Fuel (" + p.powderCost + ")";
+    launcher.textContent = "Buy launcher (" + p.launcherCost + ")";
+    wall.textContent = "Wall (" + p.wallCost + ")";
+    tower.textContent = "Mine tower (" + p.towerCost + ")";
+    patriot.textContent = "Patriot (" + p.patriotCost + ")";
+    a2a.textContent = "Air-to-air (" + p.interceptorCost + ")";
     document.getElementById("buy-drone").textContent = "Attack drone (" + p.droneCost + ")";
     document.getElementById("buy-nuke").textContent = "Nuclear rocket (" + b.nuclearRocketCost + ")";
+    ball.title = "One shot from the launcher. Firing it spends the fuel you set on the slider.";
+    powderBtn.title = "Ten units of fuel. A shot spends the charge you choose, from 3 up to your fuel capacity.";
+    launcher.title = "Rebuilds the launcher after it has been destroyed. You need it to fire rockets.";
+    document.getElementById("mobilisation").title = "Once a turn, spend 1 population. With a launcher standing, that buys one rocket. With the launcher gone, your people rebuild it for free.";
+    wall.title = "A small patch of wall. Click the map where it touches your castle.";
+    tower.title = "A mine on the outer ground. Each one that is still standing earns 30 gold a turn. Three at most.";
+    patriot.title = "A battery by the hill. It is what fires your air-to-air missiles. Only one can stand, and it can be destroyed.";
+    a2a.title = "One missile for the patriot. It tries to shoot down an incoming rocket, and it always hits a drone you have set it to target. It does nothing until the patriot is standing.";
   }
 
   function myTurn() {
     return match && match.phase === "aim" && match.turn === "left" && decree.hidden && allies.hidden && ultimatum.hidden;
+  }
+
+  function paintFuelMeter(ruler) {
+    const cap = Math.max(1, B.fuelCapacity(ruler));
+    const stock = Math.max(0, ruler.powder);
+    const short = Math.max(0, cap - stock);
+    fuelMeter.style.setProperty("--stock", String(short > 0 ? stock : 1));
+    fuelMeter.style.setProperty("--short", String(short));
+    fuelShort.hidden = short <= 0;
+    fuelMeter.classList.toggle("is-empty", stock <= 0);
+    if (short > 0) fuelMeter.title = short + " short of a fuel capacity of " + cap + ".";
+    else fuelMeter.removeAttribute("title");
   }
 
   function refresh() {
@@ -256,6 +314,7 @@
     detail.textContent = match.detail;
     const chargeMax = Math.min(B.fuelCapacity(ruler), ruler.powder);
     powder.max = String(Math.max(b.powderMin, chargeMax));
+    paintFuelMeter(ruler);
     if (ruler.powder >= b.powderMin && match.left.powder > chargeMax) {
       match.left.powder = chargeMax;
       B.syncAim(match);
@@ -268,6 +327,8 @@
     powderVal.textContent = powder.value;
     paintLedger(statsPanel, ledgerValues(ruler, match.left));
     paintLedger(enemyPanel, ledgerValues(match.rulers.right, match.right));
+    paintIncome(statsPanel, ruler, match.left);
+    paintIncome(enemyPanel, match.rulers.right, match.right);
     paintOil(statsPanel, match.left, 0);
     paintOil(enemyPanel, match.right, match.oilRigsDestroyed || 0);
     paintNukes(enemyPanel, match.mode === "free" ? 0 : (match.rulers.right.nukes || 0), false);
@@ -298,23 +359,21 @@
     const buyDrone = document.getElementById("buy-drone");
     buyDrone.hidden = factory < 1;
     buyDrone.disabled = factory < 1 || built >= factory;
+    buyDrone.title = "One drone, after you have a drone factory. You can buy only as many as the factory level each turn. Plan the attack, then click the map. The blast is half a rocket's, and the enemy can intercept it.";
     if (factory > 0) {
-      buyDrone.title = "Built " + built + " of " + factory + " this turn.";
+      buyDrone.title += " Built " + built + " of " + factory + " this turn.";
     }
     const buyNuke = document.getElementById("buy-nuke");
     buyNuke.hidden = match.mode === "free" || !ruler.nuclearProgram;
-    buyNuke.title = "Buy a nuclear rocket for " + b.nuclearRocketCost + " gold. It is stored and cannot be fired.";
+    buyNuke.title = "Adds one nuclear rocket to the arsenal count.";
     researchNuclear.hidden = match.mode === "free";
     alliedHelp.hidden = match.mode === "free" || !match.alliedHelp;
     document.getElementById("buy-launcher").hidden = B.hasType(match.left, "cannon");
     document.getElementById("buy-patriot").hidden = B.patriotAlive(match.left);
     const mobilise = document.getElementById("mobilisation");
     mobilise.disabled = !myTurn() || !!ruler.mobilised || ruler.population < 1;
-    mobilise.title = ruler.mobilised
-      ? "Already used this turn."
-      : B.hasType(match.left, "cannon")
-        ? "Use 1 population to get 1 rocket (once per turn)."
-        : "Use 1 population to get a free launcher (once per turn).";
+    mobilise.title = "Once a turn, spend 1 population. With a launcher standing, that buys one rocket. With the launcher gone, your people rebuild it for free.";
+    if (ruler.mobilised) mobilise.title = "Already used this turn. " + mobilise.title;
     canvas.classList.toggle("aiming-drone", aiming);
     canvas.classList.toggle("using-putty", usingPutty);
     angle.disabled = !myTurn();
@@ -555,7 +614,53 @@
     }, 2000);
   }
 
+  function livesLost(side) {
+    const start = match.startPop && match.startPop[side];
+    const now = match.rulers[side] ? match.rulers[side].population : 0;
+    if (start == null) return 0;
+    return Math.max(0, start - now);
+  }
+
+  function livesLine(lost, mobilised) {
+    const n = Math.max(0, lost || 0);
+    const sent = Math.max(0, mobilised || 0);
+    if (!sent) return String(n);
+    return n + ", including " + sent + " mobilised";
+  }
+
+  function victorySpeech(turns) {
+    const n = turns || 0;
+    const stood = n < 1
+      ? "Before your own turn had come, you stood"
+      : n === 1
+        ? "For one turn you stood"
+        : "For " + n + " turns you stood";
+    return "The civilized world would like a moment. We practiced this in the mirror, and then we practiced being the sort of people who do not cry at a podium, and then we cried anyway. " + stood + " on that hill while we sent helmets, and speeches, and the kind of courage that fits in a communiqué. He had sixty-seven nuclear rockets and a theory about your country. You had a king, a bakery, and the bad manners to go on existing. The Overlord is dead. We are so relieved we can hardly stand up straight. You are the defender of the civilized world, which is a large thing to say, and which we are saying because it is true, and because we would like someone brave to have done it. Be proud. We are proud in the smaller way, the way of people who were kept safe by someone else and have just noticed.";
+  }
+
+  function showStoryVictory() {
+    document.getElementById("vic-turns").textContent = String(match.playerTurn || 0);
+    document.getElementById("vic-rockets").textContent = String(match.rocketsFired || 0);
+    document.getElementById("vic-drones").textContent = String(match.dronesFired || 0);
+    document.getElementById("vic-oil").textContent = String(match.oilRigsDestroyed || 0);
+    document.getElementById("vic-homes").textContent = String(match.residentialHits || 0);
+    document.getElementById("vic-lives-you").textContent = livesLine(livesLost("left"), match.mobilised);
+    document.getElementById("vic-lives-orc").textContent = String(livesLost("right"));
+    document.getElementById("victory-speech").textContent = victorySpeech(match.playerTurn || 0);
+    document.getElementById("over-plain").hidden = true;
+    document.getElementById("over-victory").hidden = false;
+    over.hidden = false;
+    document.getElementById("victory-again").focus();
+  }
+
   function showOver() {
+    const storyWin = match.mode !== "free" && match.winner === "left";
+    if (storyWin) {
+      showStoryVictory();
+      return;
+    }
+    document.getElementById("over-victory").hidden = true;
+    document.getElementById("over-plain").hidden = false;
     const title = document.getElementById("over-title");
     const text = document.getElementById("over-text");
     if (match.winner === "left") {
@@ -584,6 +689,8 @@
     if (status.textContent !== match.log) status.textContent = match.log;
     paintLedger(statsPanel, ledgerValues(match.rulers.left, match.left));
     paintLedger(enemyPanel, ledgerValues(match.rulers.right, match.right));
+    paintIncome(statsPanel, match.rulers.left, match.left);
+    paintIncome(enemyPanel, match.rulers.right, match.right);
     paintOil(statsPanel, match.left, 0);
     paintOil(enemyPanel, match.right, match.oilRigsDestroyed || 0);
     paintNukes(enemyPanel, match.mode === "free" ? 0 : (match.rulers.right.nukes || 0), false);
@@ -624,6 +731,7 @@
   storyMode.addEventListener("click", function () { start("story"); });
   freeGame.addEventListener("click", function () { start("free"); });
   document.getElementById("again").addEventListener("click", function () { start(playMode); });
+  document.getElementById("victory-again").addEventListener("click", function () { start(playMode); });
   decreeOk.addEventListener("click", dismissDecree);
   alliesOk.addEventListener("click", dismissAllies);
   document.getElementById("ask-allies").addEventListener("click", askAllies);
@@ -693,7 +801,7 @@
       researchDrone.title = "The factory can build " + factory + " drones per turn.";
     } else {
       const next = factory + 1;
-      const droneCost = B.droneFactoryCost();
+      const droneCost = B.droneFactoryCost(ruler);
       const noun = next === 1 ? "drone" : "drones";
       researchDrone.textContent = "Drone factory (" + next + " · " + droneCost + ")";
       researchDrone.disabled = false;
@@ -707,13 +815,13 @@
       researchDroneRange.title = "Drones can reach " + rangeMeters + " m from your castle.";
     } else if (factory < 1) {
       const nextRange = rangeLevel + 1;
-      const rangeCost = B.droneRangeCost();
+      const rangeCost = B.droneRangeCost(ruler);
       researchDroneRange.textContent = "Drone range (" + nextRange + " · " + rangeCost + ")";
       researchDroneRange.disabled = true;
       researchDroneRange.title = "Research the drone factory first.";
     } else {
       const nextRange = rangeLevel + 1;
-      const rangeCost = B.droneRangeCost();
+      const rangeCost = B.droneRangeCost(ruler);
       const nextMeters = Math.min(b.droneRangeMax, rangeMeters + b.droneRangeStep);
       researchDroneRange.textContent = "Drone range (" + nextRange + " · " + rangeCost + ")";
       researchDroneRange.disabled = false;
@@ -861,6 +969,40 @@
     if (!canvas.classList.contains("aiming-drone") && !canvas.classList.contains("using-putty")) canvas.style.cursor = "";
   }
 
+  function oilTip(rig) {
+    if (rig.type === "ruin") {
+      const n = rig.repair || 0;
+      const turns = n === 1 ? "1 turn" : n + " turns";
+      return "Oil rig. Ruined. Repairs in " + turns + ".";
+    }
+    const turns = b.oilRepairTurns === 1 ? "1 turn" : b.oilRepairTurns + " turns";
+    return "Oil rig. " + b.oilIncome + " gold a turn. A hit ruins it for " + turns + ".";
+  }
+
+  function factoryTip(castle) {
+    const level = B.droneFactoryLevel(match.rulers[castle.side]);
+    const hit = level <= 1 ? "A hit destroys it." : "A hit sets it back one level.";
+    return "Drone factory, level " + level + ". " + hit;
+  }
+
+  function houseTip(house) {
+    const people = house.pop || 0;
+    const left = Math.max(1, B.BALANCE.houseHits - (house.hits || 0));
+    const destroys = left === 1 ? "A hit destroys it." : left + " hits destroy it.";
+    if (people <= 0) return "Residential building. Empty. " + destroys;
+    const noun = people === 1 ? "person" : "people";
+    if (left === 1) return "Residential building, " + people + " " + noun + ". A hit destroys it.";
+    const loss = Math.min(B.BALANCE.popPerHit, people);
+    const costNoun = loss === 1 ? "person" : "people";
+    return "Residential building, " + people + " " + noun + ". A hit costs " + loss + " " + costNoun + ". " + destroys;
+  }
+
+  function buildingTip(hit) {
+    if (hit.kind === "house") return houseTip(hit.block);
+    if (hit.kind === "mine") return "Mine. " + b.towerIncome + " gold a turn. A hit destroys it.";
+    return "Launcher. Fires rockets. A hit destroys it.";
+  }
+
   function showTip(event, text) {
     tip.hidden = false;
     tip.textContent = text;
@@ -895,13 +1037,25 @@
       hideTip();
       return;
     }
+    const factory = B.factoryAt(match, point.x, point.y);
+    if (factory) {
+      canvas.style.cursor = "help";
+      showTip(event, factoryTip(factory.castle));
+      return;
+    }
+    const building = B.buildingAt(match, point.x, point.y);
+    if (building) {
+      canvas.style.cursor = "help";
+      showTip(event, buildingTip(building));
+      return;
+    }
     const rig = B.rigAt(match, point.x, point.y);
     if (!rig) {
       hideTip();
       return;
     }
     canvas.style.cursor = "help";
-    showTip(event, b.oilIncome + " gold a turn");
+    showTip(event, oilTip(rig));
   });
 
   canvas.addEventListener("mouseleave", function () {

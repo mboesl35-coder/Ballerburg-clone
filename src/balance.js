@@ -46,6 +46,9 @@
     reconstructionAt: 6,
     houseW: 48,
     houseH: 64,
+    // Sits behind the castle, opposite the launcher. Same width as a house, two thirds as tall.
+    droneFactoryW: 48,
+    droneFactoryH: 43,
     freeParcels: 5,
     incomeFactor: 0.112,
     ballCost: 30,
@@ -59,10 +62,11 @@
     maxMines: 3,
     // Empty parcels between mine towers. They start at the left edge of the map.
     mineGap: 2,
-    // Orc oil rigs. Income is twice a mine tower. A destroyed rig stands again
-    // at the start of the seventh turn after the shot.
+    // Orc oil rigs. Income is twice a mine tower. A hit leaves an undestroyable
+    // ruin. The rig is repaired from that ruin on the seventh turn after the shot.
     oilIncome: 24,
     oilRepairTurns: 7,
+    oilRuinH: 56,
     oilOutrageAt: 3,
     oilFront: 3,
     oilRear: 2,
@@ -119,6 +123,10 @@
     interceptorCost: story.interceptorCost,
     droneCost: story.droneCost,
     fuelCapacityCost: story.fuelCapacityCost,
+    // Unresearched free-game tanks hold 13. That is the smallest charge that
+    // still lands on the enemy half of the middle hill in a full headwind.
+    // Story Mode keeps BALANCE.powderBase.
+    powderBase: 13,
     guidanceCost: story.guidanceCost,
     // Rocket blast radius. Free Game only.
     // Costs: 100, 200, 300, 500. Radii: 26, 30, 34, 42.
@@ -127,8 +135,15 @@
     rocketDamageCosts: [100, 200, 300, 500],
     rocketDamageRadii: [26, 30, 34, 42],
     a2aCost: story.a2aCost,
-    droneResearchCost: story.droneResearchCost,
-    droneRangeCost: story.droneRangeCost,
+    // Drone factory. Free Game only.
+    // Costs: 300, 600, 900. Level 3 is the cap.
+    // Story Mode stays at a flat droneResearchCost and droneFactoryMax.
+    droneFactoryCosts: [300, 600, 900],
+    droneFactoryMax: 3,
+    // Drone range. Free Game only.
+    // Costs: 100, 200, 400, 1000 for levels 1–4.
+    // Story Mode stays at a flat droneRangeCost. The distance steps are shared.
+    droneRangeCosts: [100, 200, 400, 1000],
     overlordDroneFactoryMax: story.overlordDroneFactoryMax,
   };
 })();

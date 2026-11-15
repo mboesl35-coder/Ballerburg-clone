@@ -56,7 +56,7 @@
   B.fuelCapacity = function fuelCapacity(ruler) {
     const b = B.BALANCE;
     const level = ruler && ruler.fuelLevel ? ruler.fuelLevel : 0;
-    return Math.min(b.powderMax, b.powderBase + level);
+    return Math.min(b.powderMax, B.prices().powderBase + level);
   };
 
   B.fuelMaxed = function fuelMaxed(ruler) {
@@ -122,11 +122,17 @@
   };
 
   B.droneFactoryMaxed = function droneFactoryMaxed(ruler) {
-    return B.droneFactoryLevel(ruler) >= B.BALANCE.droneFactoryMax;
+    return B.droneFactoryLevel(ruler) >= B.prices().droneFactoryMax;
   };
 
-  B.droneFactoryCost = function droneFactoryCost() {
-    return B.prices().droneResearchCost;
+  function steppedCost(costs, level, flat) {
+    if (costs && costs.length) return costs[Math.min(level, costs.length - 1)];
+    return flat;
+  }
+
+  B.droneFactoryCost = function droneFactoryCost(ruler) {
+    const prices = B.prices();
+    return steppedCost(prices.droneFactoryCosts, B.droneFactoryLevel(ruler), prices.droneResearchCost);
   };
 
   B.droneRangeLevel = function droneRangeLevel(ruler) {
@@ -147,8 +153,9 @@
     return B.droneRange(ruler) >= B.BALANCE.droneRangeMax;
   };
 
-  B.droneRangeCost = function droneRangeCost() {
-    return B.prices().droneRangeCost;
+  B.droneRangeCost = function droneRangeCost(ruler) {
+    const prices = B.prices();
+    return steppedCost(prices.droneRangeCosts, B.droneRangeLevel(ruler), prices.droneRangeCost);
   };
 
   B.interceptOdds = function interceptOdds(ruler) {

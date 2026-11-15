@@ -24,6 +24,7 @@
     for (const castle of [match.left, match.right]) {
       const parts = castle.blocks.concat(castle.houses);
       if (castle.patriot && castle.patriot.type === "patriot") parts.push(castle.patriot);
+      if (castle.droneFactory && castle.droneFactory.type === "factory") parts.push(castle.droneFactory);
       for (const block of parts) {
         if (block.type === "gap") continue;
         if (block.live && !B.hasCells(block.live)) continue;
@@ -33,7 +34,7 @@
         const item = {
           block,
           castle,
-          house: block.type === "house",
+          house: block.type === "house" || block.type === "factory",
           minX: box.minX,
           minY: box.minY,
           maxX: box.maxX,

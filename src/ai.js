@@ -53,13 +53,13 @@
       ruler.guidanceLevel = B.guidanceLevel(ruler) + 1;
       notes.push("researches rocket guidance");
     }
-    if (B.droneFactoryLevel(ruler) < b.overlordDroneFactoryMax && ruler.gold >= B.droneFactoryCost() + b.ballCost) {
-      ruler.gold -= B.droneFactoryCost();
+    if (B.droneFactoryLevel(ruler) < b.overlordDroneFactoryMax && ruler.gold >= B.droneFactoryCost(ruler) + b.ballCost) {
+      ruler.gold -= B.droneFactoryCost(ruler);
       ruler.droneLevel = B.droneFactoryLevel(ruler) + 1;
       notes.push("researches the drone factory");
     }
-    if (B.droneFactoryLevel(ruler) > 0 && !B.droneRangeMaxed(ruler) && ruler.gold >= B.droneRangeCost() + b.ballCost) {
-      ruler.gold -= B.droneRangeCost();
+    if (B.droneFactoryLevel(ruler) > 0 && !B.droneRangeMaxed(ruler) && ruler.gold >= B.droneRangeCost(ruler) + b.ballCost) {
+      ruler.gold -= B.droneRangeCost(ruler);
       ruler.droneRangeLevel = B.droneRangeLevel(ruler) + 1;
       notes.push("researches drone range");
     }
@@ -76,6 +76,7 @@
       ruler.dronesBought = droneBuilt;
       notes.push(droneBuys === 1 ? "buys an attack drone" : "buys attack drones");
     }
+    B.syncDroneFactory(castle, ruler);
     return notes;
   };
 
@@ -83,6 +84,7 @@
     if (kind === "keep") return 100;
     if (kind === "cannon") return 80;
     if (kind === "patriot") return 74;
+    if (kind === "factory") return 86;
     if (kind === "house") return 60;
     return 50;
   }
@@ -101,6 +103,7 @@
     for (let i = 0; i < blocks.length; i++) add(blocks[i]);
     const houses = foe.houses || [];
     for (let i = 0; i < houses.length; i++) add(houses[i]);
+    if (foe.droneFactory && foe.droneFactory.type === "factory") add(foe.droneFactory);
     if (foe.patriot && foe.patriot.type === "patriot") add(foe.patriot);
     let pool = [];
     for (let i = 0; i < aims.length; i++) {
@@ -109,6 +112,7 @@
       const hit = B.flyDrone(match, side, aim.x, aim.y).hit;
       if (!hit || hit.type !== "block" || !hit.castle || hit.castle.side === side) continue;
       const kind = hit.block.type;
+      if (kind === "ruin") continue;
       pool.push({ x: aim.x, y: aim.y, score: droneScore(kind) + (hit.block.r || 0), kind: kind });
     }
     if (!pool.length) return null;
@@ -150,6 +154,7 @@
   function nearOwn(castle, x, y, safe) {
     const list = (castle.blocks || []).concat(castle.houses || []);
     if (castle.patriot && castle.patriot.type === "patriot") list.push(castle.patriot);
+    if (castle.droneFactory && castle.droneFactory.type === "factory") list.push(castle.droneFactory);
     for (let i = 0; i < list.length; i++) {
       const block = list[i];
       if (!block || block.type === "gap" || block.w == null || block.h == null) continue;
@@ -201,10 +206,11 @@
         }
         const block = hit.block;
         const kind = block.type;
+        if (kind === "ruin") continue;
         const bx = block.x + (block.w || b.block) / 2;
         const by = block.y + (block.h || b.block) / 2;
         const centerBonus = Math.max(0, 12 - Math.hypot(hit.x - bx, hit.y - by) * 0.25);
-        let score = kind === "keep" ? 100 : kind === "cannon" ? 80 : kind === "patriot" ? 74 : kind === "tower" ? 72 : kind === "house" ? 68 : 50;
+        let score = kind === "keep" ? 100 : kind === "factory" ? 90 : kind === "cannon" ? 80 : kind === "patriot" ? 74 : kind === "tower" ? 72 : kind === "house" ? 68 : 50;
         score += (block.r || 0) + centerBonus;
         if (kind === "house" && (block.pop || 0) > 0) score += 12;
         let kingAim = kind === "keep";
@@ -219,7 +225,7 @@
         shots.push({ angle, powder, score, kind, block, flank: block.flank || null, kingAim, kingScore });
       }
     }
-    const enemy = shots.filter((shot) => shot.kind === "keep" || shot.kind === "cannon" || shot.kind === "wall" || shot.kind === "tower" || shot.kind === "house" || shot.kind === "patriot");
+    const enemy = shots.filter((shot) => shot.kind === "keep" || shot.kind === "cannon" || shot.kind === "wall" || shot.kind === "tower" || shot.kind === "house" || shot.kind === "factory" || shot.kind === "patriot");
     if (!enemy.length) {
       if (!shots.length) return null;
       shots.sort((a, b) => b.score - a.score);
@@ -229,6 +235,7 @@
     const nonKing = enemy.filter((shot) => !shot.kingAim);
     const rest = nonKing.length ? nonKing : enemy;
     const backHouses = bestPerBlock(rest.filter((shot) => shot.kind === "house" && shot.flank === "behind"));
+    const factories = bestPerBlock(rest.filter((shot) => shot.kind === "factory"));
     const patriots = rest.filter((shot) => shot.kind === "patriot");
     const roll = Math.random();
     if (kingShots.length && roll < 0.1) {
@@ -239,6 +246,9 @@
       const populated = backHouses.filter((shot) => (shot.block.pop || 0) > 0);
       const choices = populated.length ? populated : backHouses;
       return choices[Math.floor(Math.random() * choices.length)];
+    }
+    if (factories.length && roll < 0.7) {
+      return factories[Math.floor(Math.random() * factories.length)];
     }
     if (patriots.length && Math.random() < 0.35) {
       patriots.sort((a, b) => b.score - a.score);
@@ -259,6 +269,13 @@
 
   // Opening lasts while the player's three near oil rigs still stand, and
   // through the first few exchanges if they have not fallen yet.
+  function onEnemyHill(match, side, x) {
+    const terrain = match.terrain;
+    const mid = (terrain.valleyStart + terrain.valleyEnd) / 2;
+    if (side === "right") return x <= mid && x >= terrain.valleyStart;
+    return x >= mid && x <= terrain.valleyEnd;
+  }
+
   function freeOpening(match, side) {
     const foe = side === "left" ? match.right : match.left;
     return (match.playerTurn || 0) < 7 && standingFrontRigs(foe).length > 0;
@@ -333,15 +350,17 @@
         }
       }
       if (B.fuelCapacity(ruler) < reach) {
-        const fuelBundle = b.fuelCapacityCost * 2 + b.droneResearchCost + b.droneRangeCost;
+        const fuelBundle = b.fuelCapacityCost * 2 + B.droneFactoryCost(ruler) + B.droneRangeCost(ruler);
         buyFuel(ruler.gold >= fuelBundle ? 2 : 1);
       }
       fillPowder();
       let factoryBuys = 0;
       function buyFactory(count) {
         let bought = 0;
-        while (bought < count && b.droneResearchCost > 0 && ruler.gold >= b.droneResearchCost + b.droneCost) {
-          ruler.gold -= b.droneResearchCost;
+        while (bought < count && !B.droneFactoryMaxed(ruler)) {
+          const cost = B.droneFactoryCost(ruler);
+          if (ruler.gold < cost + b.droneCost) break;
+          ruler.gold -= cost;
           ruler.droneLevel = B.droneFactoryLevel(ruler) + 1;
           bought += 1;
           factoryBuys += 1;
@@ -351,8 +370,10 @@
       let rangeBuys = 0;
       function buyRange(count) {
         let bought = 0;
-        while (bought < count && B.droneFactoryLevel(ruler) > 0 && !B.droneRangeMaxed(ruler) && ruler.gold >= b.droneRangeCost) {
-          ruler.gold -= b.droneRangeCost;
+        while (bought < count && B.droneFactoryLevel(ruler) > 0 && !B.droneRangeMaxed(ruler)) {
+          const cost = B.droneRangeCost(ruler);
+          if (ruler.gold < cost) break;
+          ruler.gold -= cost;
           ruler.droneRangeLevel = B.droneRangeLevel(ruler) + 1;
           bought += 1;
           rangeBuys += 1;
@@ -401,6 +422,7 @@
       if (fuelBuys) notes.push("researches rocket fuel capacity");
       if (factoryBuys) notes.push("researches the drone factory");
       if (rangeBuys) notes.push("researches drone range");
+      B.syncDroneFactory(castle, ruler);
       return notes;
     },
     chooseDrone: function chooseDrone(match, side) {
@@ -424,7 +446,7 @@
       function offer(block, score) {
         const shot = droneStrike(match, side, block);
         if (!shot) return;
-        if (shot.kind !== "house" && shot.kind !== "rig" && shot.kind !== "tower") return;
+        if (shot.kind !== "house" && shot.kind !== "rig" && shot.kind !== "tower" && shot.kind !== "factory") return;
         const near = side === "right" ? shot.x : -shot.x;
         const ranked = score + near / 100000;
         if (!best || ranked > best.ranked) {
@@ -438,6 +460,7 @@
         if (house.type !== "house") continue;
         offer(house, (house.pop || 0) > 0 ? 100 : 80);
       }
+      if (foe.droneFactory && foe.droneFactory.type === "factory") offer(foe.droneFactory, 112);
       const rigs = foe.rigs || [];
       for (let i = 0; i < rigs.length; i++) {
         if (rigs[i].type === "rig") offer(rigs[i], 100);
@@ -469,17 +492,18 @@
           if (nearOwn(castle, hit.x, hit.y, safeDist)) continue;
           if (hit.type === "ground") {
             const crossed = side === "right" ? hit.x <= match.terrain.valleyStart : hit.x >= match.terrain.valleyEnd;
-            if (!crossed) continue;
+            if (!crossed && !onEnemyHill(match, side, hit.x)) continue;
             const score = 20 - Math.hypot(hit.x - aimX, (hit.y - aimY) / 4) / 40;
             shots.push({ angle, powder, score, kind: "ground", block: null, flank: null, kingAim: false, kingScore: 0 });
             continue;
           }
           const block = hit.block;
           const kind = block.type;
+          if (kind === "ruin") continue;
           const bx = block.x + (block.w || b.block) / 2;
           const by = block.y + (block.h || b.block) / 2;
           const centerBonus = Math.max(0, 12 - Math.hypot(hit.x - bx, hit.y - by) * 0.25);
-          let score = kind === "keep" ? 140 : kind === "rig" ? 96 : kind === "house" ? 88 : kind === "tower" ? 84 : kind === "cannon" ? 70 : kind === "patriot" ? 30 : 40;
+          let score = kind === "keep" ? 140 : kind === "factory" ? 104 : kind === "rig" ? 96 : kind === "house" ? 88 : kind === "tower" ? 84 : kind === "cannon" ? 70 : kind === "patriot" ? 30 : 40;
           score += (block.r || 0) + centerBonus;
           if (kind === "house" && (block.pop || 0) > 0) score += 12;
           let kingAim = kind === "keep";
@@ -494,9 +518,11 @@
           shots.push({ angle, powder, score, kind, block, flank: block.flank || null, kingAim, kingScore });
         }
       }
-      const enemy = shots.filter((shot) => shot.kind === "keep" || shot.kind === "cannon" || shot.kind === "wall" || shot.kind === "tower" || shot.kind === "house" || shot.kind === "rig" || shot.kind === "patriot");
+      const enemy = shots.filter((shot) => shot.kind === "keep" || shot.kind === "cannon" || shot.kind === "wall" || shot.kind === "tower" || shot.kind === "house" || shot.kind === "factory" || shot.kind === "rig" || shot.kind === "patriot");
       const opening = freeOpening(match, side);
       const kingShots = enemy.filter((shot) => shot.kingAim);
+      const factories = bestPerBlock(enemy.filter((shot) => shot.kind === "factory"));
+      if (!opening && factories.length && Math.random() < 0.28) return factories[0];
       if (!opening && kingShots.length) {
         kingShots.sort((a, b) => b.kingScore - a.kingScore || b.score - a.score);
         return kingShots[0];
@@ -505,7 +531,7 @@
         const frontRigs = bestPerBlock(enemy.filter((shot) => shot.kind === "rig" && shot.flank === "front"));
         if (frontRigs.length) return frontRigs[0];
       }
-      const economic = bestPerBlock(enemy.filter((shot) => shot.kind === "house" || shot.kind === "rig" || shot.kind === "tower"));
+      const economic = bestPerBlock(enemy.filter((shot) => shot.kind === "house" || shot.kind === "rig" || shot.kind === "tower" || shot.kind === "factory"));
       if (economic.length) return economic[0];
       if (kingShots.length) {
         kingShots.sort((a, b) => b.kingScore - a.kingScore || b.score - a.score);

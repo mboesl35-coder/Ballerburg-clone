@@ -30,6 +30,20 @@
     ["keep"],
   ];
 
+  // Free Game seats both kings on the ground floor of the clock tower.
+  // Each column is the story skyline stretched by half (2→3, 4→6, 5→8)
+  // so the king at the bottom middle is still buried in stone.
+  const FREE_KREMLIN = [
+    ["wall", "wall", "wall", "wall", "wall", "wall"],
+    ["wall", "wall", "wall"],
+    ["wall", "wall", "wall"],
+    ["keep", "wall", "wall", "wall", "wall", "wall", "wall", "wall"],
+    ["wall", "wall", "wall"],
+    ["wall", "wall", "wall"],
+    ["wall", "wall", "wall", "wall", "wall", "wall"],
+    ["cannon"],
+  ];
+
   const LAUNCH_GAP = 34;
 
   // The enemy chamber keeps the old clearance under its floor. Deeper ground
@@ -52,18 +66,17 @@
     elev: 50,
   };
 
-  function copyTemplate() {
-    return TEMPLATE.map((col) => col.slice());
-  }
-
   B.createCastle = function createCastle(side, opts) {
     opts = opts || {};
     const kremlin = opts.style ? opts.style === "kremlin" : side === "right";
-    const columns = kremlin ? KREMLIN.map((col) => col.slice()) : copyTemplate();
+    const seatKeep = kremlin && !!opts.seatKeep;
+    const source = kremlin ? (seatKeep ? FREE_KREMLIN : KREMLIN) : TEMPLATE;
+    const columns = source.map((col) => col.slice());
     const castle = {
       side,
       style: kremlin ? "kremlin" : "stone",
       brick: kremlin ? (opts.brick || "red") : null,
+      buryKeep: kremlin && !seatKeep,
       gateCol: kremlin ? (side === "left" ? 6 : 0) : null,
       columns,
       foundation: columns.map((col) => col.slice()),
@@ -147,7 +160,7 @@
             ? originX + b.cols * b.block + LAUNCH_GAP
             : originX - b.block - LAUNCH_GAP;
           y = padY - b.block;
-        } else if (castle.style === "kremlin" && type === "keep") {
+        } else if (castle.buryKeep && type === "keep") {
           const bunker = B.BUNKER;
           x = originX + 3 * b.block;
           y = padY + b.ground - bunker.earthUnder - bunker.chamberFoot - b.block;
@@ -178,7 +191,7 @@
     if (castle.rigs) {
       for (let i = 0; i < castle.rigs.length; i++) {
         const rig = castle.rigs[i];
-        if (rig.type === "rig") blocks.push(rig);
+        if (rig.type === "rig" || rig.type === "ruin") blocks.push(rig);
       }
     }
     if (castle.extraWalls) {
@@ -255,6 +268,52 @@
       }
     }
     castle.houses = houses;
+  };
+
+  // Flush against the outer wall, on the side opposite the launcher.
+  B.factoryFootprint = function factoryFootprint(castle) {
+    const b = B.BALANCE;
+    const w = b.droneFactoryW;
+    const h = b.droneFactoryH;
+    const x = castle.side === "left" ? castle.originX - w : castle.originX + b.cols * b.block;
+    return { x: x, w: w, h: h };
+  };
+
+  // Level 1 and above leaves one building. Level 0 removes it.
+  // A higher level does not change the building.
+  B.syncDroneFactory = function syncDroneFactory(castle, ruler) {
+    if (!castle) return;
+    const standing = castle.droneFactory && castle.droneFactory.type === "factory";
+    if (B.droneFactoryLevel(ruler) < 1) {
+      if (!standing) return;
+      const factory = castle.droneFactory;
+      factory.type = "gap";
+      factory.live = {};
+      factory.base = {};
+      factory._mask = null;
+      factory._bounds = null;
+      castle._geom = (castle._geom || 0) + 1;
+      return;
+    }
+    if (standing || !castle.terrain) return;
+    const spot = B.factoryFootprint(castle);
+    const ground = castle.terrain.yAt(spot.x + spot.w / 2);
+    const factory = castle.droneFactory || {};
+    factory.type = "factory";
+    factory.flank = "behind";
+    factory.slot = 0;
+    factory.c = 0;
+    factory.r = 0;
+    factory.x = spot.x;
+    factory.y = ground - spot.h;
+    factory.w = spot.w;
+    factory.h = spot.h;
+    factory.live = null;
+    factory.base = null;
+    factory._mask = null;
+    factory._bounds = null;
+    castle.droneFactory = factory;
+    castle._geom = (castle._geom || 0) + 1;
   };
 
   // Structures are new again. Occupants stay in the house they already occupy.
@@ -381,12 +440,12 @@
 
   B.applyBlast = function applyBlast(match, x, y, radius) {
     if (radius == null) radius = B.BALANCE.blastRadius;
-    const report = { keeps: [], cannons: [], towers: [], rigs: [], rigLoss: { left: 0, right: 0 }, walls: [], patriots: [], houseLoss: { left: 0, right: 0 }, houseGone: { left: 0, right: 0 }, popLost: { left: 0, right: 0 }, popHomes: { left: 0, right: 0 } };
+    const report = { keeps: [], cannons: [], towers: [], rigs: [], rigLoss: { left: 0, right: 0 }, walls: [], patriots: [], houseLoss: { left: 0, right: 0 }, houseGone: { left: 0, right: 0 }, popLost: { left: 0, right: 0 }, popHomes: { left: 0, right: 0 }, factoryLevel: { left: null, right: null } };
     for (const castle of [match.left, match.right]) {
       castle._geom = (castle._geom || 0) + 1;
       let coverDirty = false;
       for (const block of castle.blocks) {
-        if (block.type === "gap") continue;
+        if (block.type === "gap" || block.type === "ruin") continue;
         B.solidMask(block, castle);
         if (!hasCells(block.live)) continue;
         const vital = block.type === "keep" || block.type === "cannon" || block.type === "tower" || block.type === "rig";
@@ -405,20 +464,28 @@
             }
           }
           else note(report.towers, castle.side);
-          block.live = {};
-          block.base = {};
           block._mask = null;
           block._bounds = null;
           if (block.oil) {
             block.repair = B.BALANCE.oilRepairTurns;
-          } else if (block.mine) {
-            const mines = castle.mines || [];
-            const index = mines.indexOf(block);
-            if (index >= 0) mines.splice(index, 1);
+            block.type = "ruin";
+            block.live = null;
+            block.base = null;
+            const stump = Math.min(block.h, B.BALANCE.oilRuinH);
+            block.y += block.h - stump;
+            block.h = stump;
           } else {
-            castle.columns[block.c][block.r] = "gap";
+            block.live = {};
+            block.base = {};
+            if (block.mine) {
+              const mines = castle.mines || [];
+              const index = mines.indexOf(block);
+              if (index >= 0) mines.splice(index, 1);
+            } else {
+              castle.columns[block.c][block.r] = "gap";
+            }
+            block.type = "gap";
           }
-          block.type = "gap";
           coverDirty = true;
         } else if (B.carveBlock(block, x, y, radius)) {
           note(report.walls, castle.side);
@@ -431,6 +498,9 @@
         if (!hasCells(house.live)) continue;
         if (!B.diskTouchesBlock(house, x, y, radius)) continue;
         house.hits += 1;
+        if (castle.side === "right" && match.turn !== "right") {
+          match.residentialHits = (match.residentialHits || 0) + 1;
+        }
         house._mask = null;
         house.base = null;
         house.live = null;
@@ -449,6 +519,17 @@
           report.houseGone[castle.side] += 1;
         }
         report.houseLoss[castle.side] += 1;
+      }
+      const factory = castle.droneFactory;
+      if (factory && factory.type === "factory") {
+        B.solidMask(factory, castle);
+        if (hasCells(factory.live) && B.diskTouchesBlock(factory, x, y, radius)) {
+          const ruler = match.rulers[castle.side];
+          const level = B.droneFactoryLevel(ruler);
+          ruler.droneLevel = Math.max(0, level - 1);
+          report.factoryLevel[castle.side] = ruler.droneLevel;
+          B.syncDroneFactory(castle, ruler);
+        }
       }
       const patriot = castle.patriot;
       if (patriot && patriot.type === "patriot") {
@@ -497,6 +578,8 @@
       const parcelX = behind[slot];
       if (parcelX == null) continue;
       if (!parcelFreeOfOil(castle, parcelX)) continue;
+      const foot = B.factoryFootprint(castle);
+      if (parcelX < foot.x + foot.w && parcelX + b.block > foot.x) continue;
       const ground = castle.terrain.yAt(parcelX + b.block / 2);
       mines.push({
         type: "tower",
@@ -621,7 +704,10 @@
       const stood = seatRig(castle.terrain, rig.x, rig.flank, rig.slot);
       rig.type = "rig";
       rig.repair = 0;
+      rig.x = stood.x;
       rig.y = stood.y;
+      rig.w = stood.w;
+      rig.h = stood.h;
       rig.live = null;
       rig.base = null;
       rig._mask = null;
@@ -631,6 +717,54 @@
     if (changed) B.layoutCastle(castle, castle.terrain);
   };
 
+  function pointInBlock(block, castle, x, y) {
+    const pad = 48;
+    if (x < block.x - pad || x > block.x + block.w + pad || y < block.y - pad || y > block.y + block.h + pad) return false;
+    if (!B.solidMask) return false;
+    B.solidMask(block, castle);
+    const box = block._bounds;
+    if (!box || x < box.minX || x > box.maxX || y < box.minY || y > box.maxY) return false;
+    const size = B.BALANCE.cell;
+    const key = Math.floor((x - block.x) / size) + "," + Math.floor((y - block.y) / size);
+    return !!(block.live && block.live[key]);
+  }
+
+  // The painted building under the cursor: a house, a mine tower, or a launcher.
+  B.buildingAt = function buildingAt(match, x, y) {
+    if (!match) return null;
+    const castles = [match.left, match.right];
+    for (let c = 0; c < castles.length; c++) {
+      const castle = castles[c];
+      const houses = castle.houses || [];
+      for (let i = 0; i < houses.length; i++) {
+        const house = houses[i];
+        if (house.type !== "house") continue;
+        if (pointInBlock(house, castle, x, y)) return { kind: "house", castle: castle, block: house };
+      }
+      const blocks = castle.blocks || [];
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        if (block.type !== "tower" && block.type !== "cannon") continue;
+        if (!pointInBlock(block, castle, x, y)) continue;
+        return { kind: block.type === "tower" ? "mine" : "launcher", castle: castle, block: block };
+      }
+    }
+    return null;
+  };
+
+  B.factoryAt = function factoryAt(match, x, y) {
+    if (!match) return null;
+    const castles = [match.left, match.right];
+    for (let c = 0; c < castles.length; c++) {
+      const factory = castles[c].droneFactory;
+      if (!factory || factory.type !== "factory") continue;
+      if (x >= factory.x && x <= factory.x + factory.w && y >= factory.y && y <= factory.y + factory.h) {
+        return { castle: castles[c], factory: factory };
+      }
+    }
+    return null;
+  };
+
   B.rigAt = function rigAt(match, x, y) {
     if (!match) return null;
     const castles = [match.right, match.left];
@@ -638,7 +772,7 @@
       const rigs = castles[c].rigs || [];
       for (let i = 0; i < rigs.length; i++) {
         const rig = rigs[i];
-        if (rig.type !== "rig") continue;
+        if (rig.type !== "rig" && rig.type !== "ruin") continue;
         if (x >= rig.x && x <= rig.x + rig.w && y >= rig.y && y <= rig.y + rig.h) return rig;
       }
     }
@@ -678,6 +812,10 @@
     const p = castle.patriot;
     if (p && p.type === "patriot") {
       if (x + size > p.x && x < p.x + p.w && y + size > p.y && y < p.y + p.h) return true;
+    }
+    const factory = castle.droneFactory;
+    if (factory && factory.type === "factory") {
+      if (x + size > factory.x && x < factory.x + factory.w && y + size > factory.y && y < factory.y + factory.h) return true;
     }
     return false;
   }

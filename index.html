@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ballerburg_2026</title>
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="icon" href="favicon.ico?v=1" sizes="any">
+  <link rel="icon" href="favicon.png?v=1" type="image/png">
+  <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
   <main>
@@ -21,7 +23,7 @@
           <p class="splash-lead">A turn-based artillery duel. You hold the left castle; the Orc Overlord holds the right. Each turn you aim a rocket, spend gold on walls, mines, and weapons, and try to kill the king on the far hill before his special military operation kills you. Guard your population. History, he insists, is on his side.</p>
           <div class="mode-actions">
             <button id="story-mode" type="button">Story Mode</button>
-            <button id="free-game" type="button" class="ghost">Free Game</button>
+            <button id="free-game" type="button">Free Game</button>
           </div>
           <p id="free-soon" class="mode-note" hidden aria-live="polite">Free Game is not open yet.</p>
         </div>
@@ -29,6 +31,20 @@
     </section>
 
     <section id="play" hidden>
+      <div id="ledgers">
+        <section id="stats" class="ledger you" aria-label="Your economy">
+          <h2>You</h2>
+          <div class="stats"></div>
+          <h3 class="research-head">Research levels</h3>
+          <div class="research-levels"></div>
+        </section>
+        <section id="enemy-stats" class="ledger enemy" aria-label="Enemy economy">
+          <h2>Enemy</h2>
+          <div class="stats"></div>
+          <h3 class="research-head">Research levels</h3>
+          <div class="research-levels"></div>
+        </section>
+      </div>
       <div id="frame">
         <canvas id="view" width="4800" height="1532" tabindex="0"></canvas>
       </div>
@@ -131,26 +147,15 @@
           <path fill="#d7dee4" d="M12.6 12.4 19.4 6h1.4l-6.4 6.8z"/>
         </symbol>
       </svg>
-      <div id="ledgers">
-        <section id="stats" class="ledger you" aria-label="Your economy">
-          <h2>You</h2>
-          <div class="stats"></div>
-          <h3 class="research-head">Research levels</h3>
-          <div class="research-levels"></div>
-        </section>
-        <section id="enemy-stats" class="ledger enemy" aria-label="Enemy economy">
-          <h2>Enemy</h2>
-          <div class="stats"></div>
-          <h3 class="research-head">Research levels</h3>
-          <div class="research-levels"></div>
-        </section>
-      </div>
       <div class="controls">
         <label>Angle <span id="angle-val">48°</span>
           <input id="angle" type="range" min="10" max="80" value="48">
         </label>
         <label>Rocket Fuel <span id="powder-val">10</span>
-          <input id="powder" type="range" min="3" max="10" value="10">
+          <span class="fuel-meter" id="fuel-meter">
+            <input id="powder" type="range" min="3" max="10" value="10">
+            <span class="fuel-short" id="fuel-short" hidden></span>
+          </span>
         </label>
         <div class="shot-actions">
           <button id="plan-drone" type="button" hidden>Plan a drone attack</button>
@@ -250,15 +255,37 @@
   </section>
 
   <section id="over" hidden>
-    <div class="card">
+    <div class="card" id="over-plain">
       <h2 id="over-title"></h2>
       <p id="over-text"></p>
       <button id="again" type="button">Again</button>
     </div>
+    <div class="card decree-card" id="over-victory" hidden role="dialog" aria-modal="true" aria-labelledby="victory-title">
+      <div class="decree-layout">
+        <figure class="portrait">
+          <img src="allies.jpeg" width="2752" height="1536" alt="The leader of the allies, speaking from his office">
+        </figure>
+        <div class="decree-copy">
+          <p class="eyebrow">The record of the war</p>
+          <h2 id="victory-title">Defender of the civilized world</h2>
+          <dl class="victory-stats">
+            <dt>Turns</dt><dd id="vic-turns">0</dd>
+            <dt>Rockets fired</dt><dd id="vic-rockets">0</dd>
+            <dt>Drones fired</dt><dd id="vic-drones">0</dd>
+            <dt>Oil rigs hit</dt><dd id="vic-oil">0</dd>
+            <dt>Residential buildings hit</dt><dd id="vic-homes">0</dd>
+            <dt>Your lives lost</dt><dd id="vic-lives-you">0</dd>
+            <dt>The Overlord's lives lost</dt><dd id="vic-lives-orc">0</dd>
+          </dl>
+          <p id="victory-speech" class="decree-speech"></p>
+          <button id="victory-again" type="button">Again</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <script src="src/balance.js"></script>
-  <script src="src/castles.js"></script>
+  <script src="src/castles.js?v=4"></script>
   <script src="src/terrain.js"></script>
   <script src="src/physics.js"></script>
   <script src="src/economy.js"></script>
@@ -266,6 +293,6 @@
   <script src="src/render.js"></script>
   <script src="src/audio.js"></script>
   <script src="src/game.js"></script>
-  <script src="src/main.js"></script>
+  <script src="src/main.js?v=29"></script>
 </body>
 </html>

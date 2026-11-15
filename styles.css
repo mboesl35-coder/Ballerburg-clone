@@ -146,16 +146,6 @@ main {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
-#free-game {
-  background: rgba(18, 14, 10, 0.45);
-  border-color: rgba(224, 164, 90, 0.45);
-}
-
-#free-game:hover {
-  background: rgba(36, 28, 20, 0.72);
-  color: var(--paper);
-}
-
 .mode-note {
   margin: 14px 0 0;
   min-height: 1.2em;
@@ -297,109 +287,103 @@ canvas.using-putty { cursor: none; }
 #ledgers {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin: 10px 0 4px;
+  gap: 8px;
+  margin: 0 0 8px;
 }
 
 .ledger {
-  padding: 10px 14px 12px;
+  padding: 4px 8px 5px;
   background: rgba(44, 36, 28, 0.72);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .ledger.you { box-shadow: inset 3px 0 0 #9d2c32; }
 .ledger.enemy { box-shadow: inset -3px 0 0 #2a4178; }
 
 .ledger h2 {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 2px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .ledger.you h2 { color: #e7b4b4; text-align: left; }
 .ledger.enemy h2 { color: #b7c6ea; text-align: right; }
 
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px 6px;
-  justify-items: center;
+.stats,
+.research-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px 8px;
+  align-items: center;
 }
 
-.ledger.enemy .stats { direction: rtl; }
+.ledger.enemy .stats,
+.ledger.enemy .research-levels { direction: rtl; }
 
 .stat {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 1px;
-  width: 76px;
+  gap: 3px;
   direction: ltr;
+  white-space: nowrap;
 }
 
 .stat.off { opacity: 0.38; }
 
 .ico {
-  width: 26px;
-  height: 26px;
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .ico.emoji {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 14px;
   line-height: 1;
 }
 
 .stat .meta {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.05;
-  text-align: center;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 3px;
+  line-height: 1;
 }
 
 .stat .n {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
   font-style: normal;
   color: var(--paper);
 }
 
 .stat .name {
-  margin-top: 1px;
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #b7a890;
 }
 
 .research-head {
-  margin: 12px 0 6px;
-  padding-top: 8px;
+  margin: 3px 0 1px;
+  padding-top: 3px;
   border-top: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--gold);
 }
 
 .ledger.you .research-head { text-align: left; }
 .ledger.enemy .research-head { text-align: right; }
-
-.research-levels {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px 6px;
-  justify-items: center;
-}
-
-.ledger.enemy .research-levels { direction: rtl; }
 
 @media (max-width: 640px) {
   #ledgers { grid-template-columns: 1fr; }
@@ -566,6 +550,30 @@ canvas.using-putty { cursor: none; }
   gap: 10px;
 }
 
+.victory-stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 20px;
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  background: rgba(16, 12, 8, 0.45);
+  border: 1px solid rgba(224, 164, 90, 0.35);
+  border-radius: 12px;
+}
+
+.victory-stats dt,
+.victory-stats dd {
+  margin: 0;
+}
+
+.victory-stats dt { color: #d9cbb4; }
+
+.victory-stats dd {
+  color: var(--gold);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .stat[hidden] { display: none; }
 
 @media (max-width: 640px) {
@@ -573,3 +581,32 @@ canvas.using-putty { cursor: none; }
 }
 
 input[type="range"] { accent-color: var(--gold-deep); }
+
+.fuel-meter {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.fuel-meter input[type="range"] {
+  flex: var(--stock, 1) 1 0;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.fuel-short {
+  flex: var(--short, 0) 1 0;
+  height: 4px;
+  min-width: 0;
+  margin-left: -2px;
+  background: #d24b45;
+  border-radius: 0 999px 999px 0;
+}
+
+.fuel-short[hidden] { display: none; }
+
+.fuel-meter.is-empty input[type="range"] { display: none; }
+
+.fuel-meter.is-empty .fuel-short { margin-left: 0; }
